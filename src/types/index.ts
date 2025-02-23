@@ -2,6 +2,7 @@ export interface Member {
   id: string;
   name: string;
   groupId: string;
+  currentPunishmentDays?: number; // 当前剩余惩罚天数
 }
 
 export interface Group {
@@ -28,6 +29,14 @@ export interface DutySchedule {
 export interface Admin {
   username: string;
   password: string;
+}
+
+export interface DutyStatus {
+  memberId: string;
+  date: string;
+  status: '已完成' | '未完成' | '缺勤';
+  punishmentDays: number;
+  comment?: string;
 }
 
 // 考勤状态的颜色映射
