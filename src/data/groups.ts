@@ -2,9 +2,9 @@ import { Group } from '@/types';
 
 // 定义人员数据
 const MEMBERS_DATA = [
-  { name: '赵云', group: 1 },
-  { name: '周比蒙', group: 1 },
-  { name: '陈子盈', group: 1 },
+  { name: '赵芸', group: 1 },
+  { name: '周抒墨', group: 1 },
+  { name: '谈子盈', group: 1 },
   { name: '邱力之', group: 2 },
   { name: '洪声浩', group: 2 },
   { name: '甘倍结', group: 2 },
