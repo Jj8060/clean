@@ -1,8 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { format, isSameDay, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useDutyStatuses } from '@/hooks/useDutyStatuses';
-import { Group, Member } from '@/types';
+import { Group, Member, AttendanceStatus } from '@/types';
 import { groups } from '@/data/groups';
+
+// 添加 Props 接口定义
+interface CalendarProps {
+  dutySchedule: {
+    weekStart: Date;
+    group: {
+      id: string;
+      name: string;
+      members: Member[];
+    };
+  }[];
+  attendanceRecords: AttendanceStatus[];
+  onSelectDate: (date: Date) => void;
+  isAdmin: boolean;
+  currentDate: Date;
+  onUpdateSchedule?: (weekStart: Date, newGroupId: string) => void;
+  extraDutyMembers: Array<{
+    memberId: string;
+    date: string;
+  }>;
+  onAddExtraDuty?: (date: Date) => void;
+}
 
 const DayCell = ({ date, group, members, isToday }: { 
   date: Date, 
@@ -33,8 +55,17 @@ const DayCell = ({ date, group, members, isToday }: {
   );
 };
 
-const Calendar = () => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+// 添加 Props 类型
+const Calendar = ({
+  dutySchedule,
+  attendanceRecords,
+  onSelectDate,
+  isAdmin,
+  currentDate,
+  onUpdateSchedule,
+  extraDutyMembers,
+  onAddExtraDuty
+}: CalendarProps) => {
   const today = new Date();
 
   // 设置日期范围限制
@@ -49,7 +80,7 @@ const Calendar = () => {
 
   const goToToday = () => {
     if (isDateInRange(today)) {
-      setCurrentDate(today);
+      onSelectDate(today);
       // 这里需要添加滚动到今天的日期的逻辑
       const todayElement = document.querySelector('[data-today="true"]');
       if (todayElement) {
@@ -59,7 +90,7 @@ const Calendar = () => {
   };
 
   const goToPreviousMonth = () => {
-    setCurrentDate(prevDate => {
+    onSelectDate(prevDate => {
       const newDate = new Date(prevDate);
       newDate.setMonth(newDate.getMonth() - 1);
       return isDateInRange(newDate) ? newDate : prevDate;
@@ -67,7 +98,7 @@ const Calendar = () => {
   };
 
   const goToNextMonth = () => {
-    setCurrentDate(prevDate => {
+    onSelectDate(prevDate => {
       const newDate = new Date(prevDate);
       newDate.setMonth(newDate.getMonth() + 1);
       return isDateInRange(newDate) ? newDate : prevDate;
