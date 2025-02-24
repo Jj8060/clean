@@ -13,6 +13,7 @@ import Calendar from '@/components/Calendar';
 const Home = () => {
   const [currentDate, setCurrentDate] = useState(new Date('2025-01-01'));
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isRootAdmin, setIsRootAdmin] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{
     member: any;
     date: Date;
@@ -98,7 +99,9 @@ const Home = () => {
   useEffect(() => {
     const adminUser = localStorage.getItem('adminUser');
     if (adminUser) {
+      const userData = JSON.parse(adminUser);
       setIsAdmin(true);
+      setIsRootAdmin(userData.isRoot);
     }
   }, []);
 
@@ -146,6 +149,7 @@ const Home = () => {
   // 处理登出
   const handleLogout = () => {
     setIsAdmin(false);
+    setIsRootAdmin(false);
     localStorage.removeItem('adminUser');
   };
 
@@ -220,6 +224,14 @@ const Home = () => {
       // 强制重新渲染日历
       setCurrentDate(new Date(currentDate));
     }
+  };
+
+  // 修改登录处理
+  const handleLogin = (isRoot: boolean) => {
+    setIsAdmin(true);
+    setIsRootAdmin(isRoot);
+    localStorage.setItem('adminUser', JSON.stringify({ isRoot }));
+    setShowLoginModal(false);
   };
 
   return (
@@ -297,6 +309,14 @@ const Home = () => {
           >
             考核统计
           </Link>
+          {isRootAdmin && (
+            <Link
+              href="/admin-management"
+              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+            >
+              管理员管理
+            </Link>
+          )}
           <button
             onClick={() => isAdmin ? handleLogout() : setShowLoginModal(true)}
             className={`px-4 py-2 rounded ${
@@ -443,7 +463,7 @@ const Home = () => {
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        onLogin={() => setIsAdmin(true)}
+        onLogin={handleLogin}
       />
 
       {/* 添加额外值日人员弹窗 */}

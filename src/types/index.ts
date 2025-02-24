@@ -29,7 +29,8 @@ export interface DutySchedule {
 export interface Admin {
   username: string;
   password: string;
-  isRoot: boolean;
+  isRoot: boolean;  // 标识是否为终端管理员
+  createdAt?: string;  // 创建时间
 }
 
 export interface DutyStatus {
