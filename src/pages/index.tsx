@@ -8,6 +8,7 @@ import { AttendanceStatus, STATUS_COLORS } from '@/types';
 import Link from 'next/link';
 import LoginModal from '@/components/LoginModal';
 import AddExtraDutyModal from '@/components/AddExtraDutyModal';
+import Calendar from '@/components/Calendar';
 
 const Home = () => {
   const [currentDate, setCurrentDate] = useState(new Date('2025-01-01'));
@@ -331,7 +332,7 @@ const Home = () => {
       {/* 视图切换 */}
       {viewMode === 'calendar' ? (
         <div className="max-w-6xl mx-auto">
-          <CalendarView
+          <Calendar
             dutySchedule={dutySchedule}
             attendanceRecords={attendanceRecords}
             onSelectDate={handleDateSelect}

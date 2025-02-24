@@ -29,6 +29,7 @@ export interface DutySchedule {
 export interface Admin {
   username: string;
   password: string;
+  isRoot: boolean;
 }
 
 export interface DutyStatus {
