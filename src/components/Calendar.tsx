@@ -90,19 +90,19 @@ const Calendar = ({
   };
 
   const goToPreviousMonth = () => {
-    onSelectDate(prevDate => {
-      const newDate = new Date(prevDate);
-      newDate.setMonth(newDate.getMonth() - 1);
-      return isDateInRange(newDate) ? newDate : prevDate;
-    });
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() - 1);
+    if (isDateInRange(newDate)) {
+      onSelectDate(newDate);
+    }
   };
 
   const goToNextMonth = () => {
-    onSelectDate(prevDate => {
-      const newDate = new Date(prevDate);
-      newDate.setMonth(newDate.getMonth() + 1);
-      return isDateInRange(newDate) ? newDate : prevDate;
-    });
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + 1);
+    if (isDateInRange(newDate)) {
+      onSelectDate(newDate);
+    }
   };
 
   // 添加日历格子渲染逻辑

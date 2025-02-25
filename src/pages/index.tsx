@@ -355,7 +355,10 @@ const Home = () => {
           <Calendar
             dutySchedule={dutySchedule}
             attendanceRecords={attendanceRecords}
-            onSelectDate={handleDateSelect}
+            onSelectDate={(date) => {
+              setCurrentDate(date);
+              handleDateSelect(date);
+            }}
             isAdmin={isAdmin}
             currentDate={currentDate}
             onUpdateSchedule={isAdmin ? handleUpdateSchedule : undefined}
