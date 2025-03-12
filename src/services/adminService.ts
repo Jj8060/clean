@@ -1,6 +1,20 @@
 import { Admin } from '@/types';
 import { admins, rootAdmin } from '@/data/admins';
 
+// 从 localStorage 加载管理员数据
+const loadAdmins = () => {
+  const savedAdmins = localStorage.getItem('admins');
+  if (savedAdmins) {
+    return JSON.parse(savedAdmins);
+  }
+  return [];
+};
+
+// 保存管理员数据到 localStorage
+const saveAdmins = (admins: Admin[]) => {
+  localStorage.setItem('admins', JSON.stringify(admins));
+};
+
 // 验证登录
 export const verifyLogin = (username: string, password: string): { isValid: boolean; isRoot: boolean } => {
   console.log('Verifying login:', { username, password, rootAdmin }); // 添加调试日志
@@ -11,37 +25,40 @@ export const verifyLogin = (username: string, password: string): { isValid: bool
   }
   
   // 检查是否是普通管理员
-  const admin = admins.find(a => a.username === username && a.password === password);
+  const savedAdmins = loadAdmins();
+  const admin = savedAdmins.find(a => a.username === username && a.password === password);
   return { isValid: !!admin, isRoot: false };
 };
 
-// 添加新管理员（仅终端管理员可用）
+// 添加新管理员
 export const addAdmin = (newAdmin: Omit<Admin, 'isRoot' | 'createdAt'>) => {
+  const savedAdmins = loadAdmins();
+  
+  // 检查是否已存在相同用户名
+  if (savedAdmins.some(admin => admin.username === newAdmin.username)) {
+    throw new Error('该用户名已存在');
+  }
+
   const admin: Admin = {
     ...newAdmin,
     isRoot: false,
     createdAt: new Date().toISOString()
   };
   
-  admins.push(admin);
-  // 保存到 localStorage
-  localStorage.setItem('admins', JSON.stringify(admins));
+  savedAdmins.push(admin);
+  saveAdmins(savedAdmins);
   return admin;
 };
 
-// 删除管理员（仅终端管理员可用）
+// 删除管理员
 export const removeAdmin = (username: string) => {
-  const index = admins.findIndex(a => a.username === username);
-  if (index !== -1) {
-    admins.splice(index, 1);
-    // 保存到 localStorage
-    localStorage.setItem('admins', JSON.stringify(admins));
-    return true;
-  }
-  return false;
+  const savedAdmins = loadAdmins();
+  const filteredAdmins = savedAdmins.filter(admin => admin.username !== username);
+  saveAdmins(filteredAdmins);
+  return true;
 };
 
-// 获取所有管理员列表（仅终端管理员可见）
+// 获取所有管理员列表
 export const getAllAdmins = () => {
-  return admins;
+  return loadAdmins();
 }; 

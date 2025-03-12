@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format, isSameDay, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, isSameDay, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, addDays } from 'date-fns';
 import { useDutyStatuses } from '@/hooks/useDutyStatuses';
 import { Group, Member, AttendanceStatus } from '@/types';
 import { groups } from '@/data/groups';
@@ -113,9 +113,14 @@ const Calendar = ({
 
     return days.map((day) => {
       const isToday = isSameDay(day, today);
-      // 根据日期获取值日小组
-      const groupIndex = day.getDay(); // 这里需要根据您的实际值日安排逻辑修改
-      const group = groups[groupIndex % groups.length];
+      
+      // 查找对应的值日安排
+      const weekSchedule = dutySchedule.find(schedule => {
+        const scheduleWeekEnd = addDays(schedule.weekStart, 4);
+        return day >= schedule.weekStart && day <= scheduleWeekEnd;
+      });
+
+      const group = weekSchedule?.group || groups[0]; // 使用找到的值日组或默认第一组
 
       return (
         <DayCell

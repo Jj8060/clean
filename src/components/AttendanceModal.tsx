@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Member, AttendanceStatus, STATUS_COLORS } from '@/types';
+import { AttendanceStatus } from '@/types';
 
 interface AttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  member: Member;
+  member: { id: string; name: string };
   date: Date;
   currentStatus?: AttendanceStatus;
   onSave: (status: Partial<AttendanceStatus>) => void;
@@ -18,108 +18,95 @@ const AttendanceModal = ({
   currentStatus,
   onSave,
 }: AttendanceModalProps) => {
-  const [status, setStatus] = useState<'present' | 'absent' | 'late' | 'pending'>(
+  const [status, setStatus] = useState<AttendanceStatus['status']>(
     currentStatus?.status || 'pending'
   );
-  const [score, setScore] = useState(currentStatus?.score || 5);
+  const [score, setScore] = useState(currentStatus?.score || 100);
   const [comment, setComment] = useState(currentStatus?.comment || '');
   const [penaltyDays, setPenaltyDays] = useState(currentStatus?.penaltyDays || 0);
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     onSave({
       memberId: member.id,
       date: date.toISOString(),
       status,
       score,
       comment,
-      penaltyDays
+      penaltyDays,
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9999]">
-      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
-      <div className="bg-white rounded-lg p-6 w-[480px] relative z-[10000]">
-        <h2 className="text-xl font-semibold mb-4 text-[#2a63b7]">考勤评分</h2>
-        
-        <div className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 className="text-xl font-bold mb-4">考勤评分</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <div className="text-sm text-gray-600 mb-1">值日人员</div>
-            <div className="font-medium">{member.name}</div>
+            <label className="block mb-1">值日人员</label>
+            <div className="p-2 bg-gray-100 rounded">{member.name}</div>
           </div>
-
           <div>
-            <div className="text-sm text-gray-600 mb-1">考勤状态</div>
-            <div className="grid grid-cols-4 gap-2">
-              {(['present', 'absent', 'late', 'pending'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  className={`p-2 rounded transition-colors ${
-                    status === s 
-                      ? 'ring-2 ring-[#2a63b7] bg-[#2a63b7] text-white' 
-                      : 'border hover:bg-gray-50'
-                  }`}
-                >
-                  {s === 'present' ? '已到' : 
-                   s === 'absent' ? '缺席' : 
-                   s === 'late' ? '迟到' : '待定'}
-                </button>
-              ))}
-            </div>
+            <label className="block mb-1">状态</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as AttendanceStatus['status'])}
+              className="w-full border p-2 rounded"
+            >
+              <option value="present">已到</option>
+              <option value="absent">缺勤</option>
+              <option value="late">迟到</option>
+              <option value="pending">待评价</option>
+            </select>
           </div>
-
           <div>
-            <div className="text-sm text-gray-600 mb-1">评分 (1-10分)</div>
+            <label className="block mb-1">分数</label>
             <input
               type="number"
-              min="1"
-              max="10"
               value={score}
               onChange={(e) => setScore(Number(e.target.value))}
-              className="w-full border rounded px-3 py-2 focus:outline-none focus:border-[#2a63b7]"
+              className="w-full border p-2 rounded"
+              min={0}
+              max={100}
             />
           </div>
-
           <div>
-            <div className="text-sm text-gray-600 mb-1">惩罚值日天数</div>
+            <label className="block mb-1">惩罚天数</label>
             <input
               type="number"
-              min="0"
               value={penaltyDays}
               onChange={(e) => setPenaltyDays(Number(e.target.value))}
-              className="w-full border rounded px-3 py-2 focus:outline-none focus:border-[#2a63b7]"
+              className="w-full border p-2 rounded"
+              min={0}
             />
           </div>
-
           <div>
-            <div className="text-sm text-gray-600 mb-1">备注</div>
+            <label className="block mb-1">备注</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="w-full border rounded px-3 py-2 h-20 focus:outline-none focus:border-[#2a63b7]"
-              placeholder="请输入备注信息"
+              className="w-full border p-2 rounded"
             />
           </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border rounded hover:bg-gray-100"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-          >
-            保存
-          </button>
-        </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              保存
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
