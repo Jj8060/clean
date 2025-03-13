@@ -21,14 +21,39 @@ const AttendanceModal = ({
   const [status, setStatus] = useState<AttendanceStatus['status']>(
     currentStatus?.status || 'pending'
   );
-  const [score, setScore] = useState(currentStatus?.score || 100);
+  const [score, setScore] = useState(currentStatus?.score || 7);
   const [comment, setComment] = useState(currentStatus?.comment || '');
-  const [penaltyDays, setPenaltyDays] = useState(currentStatus?.penaltyDays || 0);
+  const [absentCount, setAbsentCount] = useState(currentStatus?.absentCount || 0);
+  const [failCount, setFailCount] = useState(currentStatus?.failCount || 0);
 
   if (!isOpen) return null;
 
+  // 计算惩罚天数
+  const calculatePenaltyDays = (newStatus: AttendanceStatus['status'], newScore: number) => {
+    let penaltyDays = 0;
+    
+    if (newStatus === 'absent') {
+      // 第一次缺勤2天，之后每次+3天
+      const newAbsentCount = absentCount + 1;
+      penaltyDays = 2 + (newAbsentCount - 1) * 3;
+      setAbsentCount(newAbsentCount);
+    } else if (newStatus === 'fail' || newScore < 6) {
+      // 不合格或分数低于6分，第一次1天，之后每次+2天
+      const newFailCount = failCount + 1;
+      penaltyDays = 1 + (newFailCount - 1) * 2;
+      // 如果分数低于3分，额外加1天惩罚
+      if (newScore < 3) {
+        penaltyDays += 1;
+      }
+      setFailCount(newFailCount);
+    }
+    
+    return penaltyDays;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const penaltyDays = calculatePenaltyDays(status, score);
     onSave({
       memberId: member.id,
       date: date.toISOString(),
@@ -36,6 +61,8 @@ const AttendanceModal = ({
       score,
       comment,
       penaltyDays,
+      absentCount,
+      failCount
     });
     onClose();
   };
@@ -58,30 +85,30 @@ const AttendanceModal = ({
             >
               <option value="present">已到</option>
               <option value="absent">缺勤</option>
-              <option value="late">迟到</option>
+              <option value="fail">不合格</option>
               <option value="pending">待评价</option>
             </select>
           </div>
           <div>
-            <label className="block mb-1">分数</label>
+            <label className="block mb-1">分数 (1-10分)</label>
             <input
               type="number"
               value={score}
               onChange={(e) => setScore(Number(e.target.value))}
               className="w-full border p-2 rounded"
-              min={0}
-              max={100}
+              min={1}
+              max={10}
             />
-          </div>
-          <div>
-            <label className="block mb-1">惩罚天数</label>
-            <input
-              type="number"
-              value={penaltyDays}
-              onChange={(e) => setPenaltyDays(Number(e.target.value))}
-              className="w-full border p-2 rounded"
-              min={0}
-            />
+            {score < 6 && (
+              <p className="text-xs text-red-500 mt-1">
+                注意：分数低于6分将被视为不合格，会增加惩罚天数
+              </p>
+            )}
+            {score < 3 && (
+              <p className="text-xs text-red-500 mt-1">
+                注意：分数低于3分将额外增加1天惩罚天数
+              </p>
+            )}
           </div>
           <div>
             <label className="block mb-1">备注</label>

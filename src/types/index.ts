@@ -15,10 +15,12 @@ export interface AttendanceStatus {
   id: string;
   date: string;
   memberId: string;
-  status: 'present' | 'absent' | 'late' | 'pending';
+  status: 'present' | 'absent' | 'fail' | 'pending';
   score: number;
   comment?: string;
   penaltyDays?: number;
+  absentCount?: number;  // 缺勤次数
+  failCount?: number;    // 不合格次数
 }
 
 export interface DutySchedule {
@@ -45,6 +47,6 @@ export interface DutyStatus {
 export const STATUS_COLORS = {
   present: '#00bd39',   // 绿色
   absent: '#ff2300',    // 红色
-  late: '#ffa500',      // 黄色
+  fail: '#ffa500',      // 黄色 (不合格)
   pending: '#808080'    // 灰色
 } as const; 

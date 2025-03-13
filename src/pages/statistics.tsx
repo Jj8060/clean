@@ -5,6 +5,32 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import RecordDetailModal from '@/components/RecordDetailModal';
 
+// 添加低分预警组件
+const LowScoreWarning = ({ statistics }: { statistics: any[] }) => {
+  const lowScoreMembers = statistics.filter(stat => Number(stat.averageScore) < 6);
+  
+  if (lowScoreMembers.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6 overflow-hidden">
+      <div className="animate-marquee whitespace-nowrap">
+        {lowScoreMembers.map(member => (
+          <span
+            key={member.id}
+            className={`inline-block mr-8 ${
+              Number(member.averageScore) < 3 
+                ? 'text-red-500 font-bold'
+                : 'text-yellow-500 font-semibold'
+            }`}
+          >
+            {member.name}: {member.averageScore}分
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const StatisticsPage = () => {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -32,7 +58,7 @@ const StatisticsPage = () => {
           attendanceCount: {
             present: memberRecords.filter(r => r.status === 'present').length,
             absent: memberRecords.filter(r => r.status === 'absent').length,
-            late: memberRecords.filter(r => r.status === 'late').length,
+            fail: memberRecords.filter(r => r.status === 'fail').length,
           },
           records: memberRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         };
@@ -76,6 +102,9 @@ const StatisticsPage = () => {
             返回排班表
           </Link>
         </div>
+
+        {/* 低分预警显示 */}
+        <LowScoreWarning statistics={statistics} />
 
         {/* 筛选器 */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
@@ -129,9 +158,9 @@ const StatisticsPage = () => {
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.present }}></span>
                         <span className="text-sm">{stat.attendanceCount.present}</span>
                       </div>
-                      <div className="flex items-center gap-1" title="迟到">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.late }}></span>
-                        <span className="text-sm">{stat.attendanceCount.late}</span>
+                      <div className="flex items-center gap-1" title="不合格">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.fail }}></span>
+                        <span className="text-sm">{stat.attendanceCount.fail}</span>
                       </div>
                       <div className="flex items-center gap-1" title="缺席">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.absent }}></span>

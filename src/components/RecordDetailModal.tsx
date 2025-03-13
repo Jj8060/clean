@@ -50,7 +50,7 @@ const RecordDetailModal = ({
                   <span>
                     {record.status === 'present' ? '已到' :
                      record.status === 'absent' ? '缺席' :
-                     record.status === 'late' ? '迟到' : '待定'}
+                     record.status === 'fail' ? '不合格' : '待定'}
                   </span>
                 </div>
               </div>

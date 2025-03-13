@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { groups } from '@/data/groups';
-import { format, eachWeekOfInterval, isWeekend, addDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, eachWeekOfInterval, isWeekend, addDays, startOfMonth, endOfMonth, startOfYear, endOfYear, isSameDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import AttendanceModal from '@/components/AttendanceModal';
 import CalendarView from '@/components/CalendarView';
@@ -9,9 +9,11 @@ import Link from 'next/link';
 import LoginModal from '@/components/LoginModal';
 import AddExtraDutyModal from '@/components/AddExtraDutyModal';
 import Calendar from '@/components/Calendar';
+import LowScoreWarning from '@/components/LowScoreWarning';
 
 const Home = () => {
   const [currentDate, setCurrentDate] = useState(new Date('2025-01-01'));
+  const [listViewDate, setListViewDate] = useState(new Date('2025-01-01'));
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRootAdmin, setIsRootAdmin] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{
@@ -92,6 +94,8 @@ const Home = () => {
     const savedRecords = localStorage.getItem('attendanceRecords');
     if (savedRecords) {
       setAttendanceRecords(JSON.parse(savedRecords));
+    } else {
+      resetAllData();
     }
   }, []);
 
@@ -234,6 +238,81 @@ const Home = () => {
     setShowLoginModal(false);
   };
 
+  // 修改周选择器组件
+  const WeekSelector = ({ 
+    currentDate, 
+    onChange 
+  }: { 
+    currentDate: Date; 
+    onChange: (date: Date) => void;
+  }) => {
+    const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
+    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+    
+    // 获取指定年份的所有工作周
+    const getWorkWeeks = (year: number) => {
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31);
+      const weeks = eachWeekOfInterval(
+        { start: startDate, end: endDate },
+        { weekStartsOn: 1 }
+      ).filter(date => date.getFullYear() === year); // 只保留指定年份的周
+      
+      return weeks.map((weekStart, index) => {
+        const weekEnd = addDays(weekStart, 4); // 只到周五
+        return {
+          weekNumber: index + 1,
+          start: weekStart,
+          end: weekEnd,
+          text: `第${index + 1}周（${format(weekStart, 'M月d日', { locale: zhCN })}至${format(weekEnd, 'M月d日', { locale: zhCN })}）`
+        };
+      });
+    };
+
+    const weeks = getWorkWeeks(selectedYear);
+    const currentWeek = weeks.find(week => 
+      currentDate >= week.start && currentDate <= week.end
+    );
+
+    return (
+      <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow mb-4">
+        <select
+          value={selectedYear}
+          onChange={(e) => {
+            const year = parseInt(e.target.value);
+            setSelectedYear(year);
+            // 选择新年份的第一周
+            const firstWeek = getWorkWeeks(year)[0];
+            onChange(firstWeek.start);
+          }}
+          className="border rounded px-3 py-1.5"
+        >
+          {years.map(year => (
+            <option key={year} value={year}>{year}年</option>
+          ))}
+        </select>
+        <select
+          value={currentWeek ? weeks.indexOf(currentWeek) : 0}
+          onChange={(e) => {
+            const week = weeks[parseInt(e.target.value)];
+            onChange(week.start);
+          }}
+          className="border rounded px-3 py-1.5 flex-1"
+        >
+          {weeks.map((week, index) => (
+            <option key={index} value={index}>{week.text}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
+  // 添加重置数据的函数
+  const resetAllData = () => {
+    setAttendanceRecords([]);
+    localStorage.removeItem('attendanceRecords');
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-[#2a63b7]">
@@ -263,44 +342,6 @@ const Home = () => {
           >
             日历视图
           </button>
-          {viewMode === 'calendar' && (
-            <div className="flex gap-2 ml-4">
-              <div className="relative">
-                <select
-                  value={currentDate.getFullYear()}
-                  onChange={(e) => handleYearChange(e.target.value)}
-                  className="w-[100px] px-3 py-2 border rounded text-gray-700 appearance-none bg-white pr-8"
-                >
-                  <option value="2025">2025年</option>
-                  <option value="2026">2026年</option>
-                  <option value="2027">2027年</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              <div className="relative">
-                <select
-                  value={currentDate.getMonth()}
-                  onChange={(e) => handleMonthChange(e.target.value)}
-                  className="w-[80px] px-3 py-2 border rounded text-gray-700 appearance-none bg-white pr-8"
-                >
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i + 1}月
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         <div className="flex gap-2">
           <Link
@@ -310,12 +351,20 @@ const Home = () => {
             考核统计
           </Link>
           {isRootAdmin && (
-            <Link
-              href="/admin-management"
-              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-            >
-              管理员管理
-            </Link>
+            <>
+              <Link
+                href="/admin-management"
+                className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+              >
+                管理员管理
+              </Link>
+              <button
+                onClick={resetAllData}
+                className="px-4 py-2 bg-[#ff2300] text-white rounded hover:bg-[#cc1c00]"
+              >
+                重置数据
+              </button>
+            </>
           )}
           <button
             onClick={() => isAdmin ? handleLogout() : setShowLoginModal(true)}
@@ -328,26 +377,28 @@ const Home = () => {
         </div>
       </div>
 
-      {/* 组别说明 */}
-      <div className="max-w-6xl mx-auto mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 text-[#2a63b7]">值日组成员</h2>
-          <div className="grid grid-cols-4 gap-4">
-            {groups.map(group => (
-              <div key={group.id} className="border rounded-lg p-3">
-                <div className="font-medium mb-2">{group.name}</div>
-                <div className="space-y-1">
-                  {group.members.map(member => (
-                    <div key={member.id} className="text-sm text-gray-600">
-                      {member.name}
-                    </div>
-                  ))}
+      {/* 组别说明 - 仅在日历视图显示 */}
+      {viewMode === 'calendar' && (
+        <div className="max-w-6xl mx-auto mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4 text-[#2a63b7]">值日组成员</h2>
+            <div className="grid grid-cols-4 gap-4">
+              {groups.map(group => (
+                <div key={group.id} className="border rounded-lg p-3">
+                  <div className="font-medium mb-2">{group.name}</div>
+                  <div className="space-y-1">
+                    {group.members.map(member => (
+                      <div key={member.id} className="text-sm text-gray-600">
+                        {member.name}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 视图切换 */}
       {viewMode === 'calendar' ? (
@@ -367,8 +418,35 @@ const Home = () => {
           />
         </div>
       ) : (
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto">
+          {/* 周选择器 */}
+          <div className="mb-4">
+            <WeekSelector
+              currentDate={listViewDate}
+              onChange={setListViewDate}
+            />
+          </div>
+
+          {/* 低分预警显示 */}
+          <LowScoreWarning 
+            attendanceRecords={attendanceRecords}
+            groups={groups}
+          />
+
+          {/* 当前周的值日安排 */}
           {dutySchedule.map(({ weekStart, group }) => {
+            // 只显示当前选中的周
+            const weekStartDate = new Date(weekStart);
+            const listViewWeekStart = new Date(listViewDate);
+            
+            if (
+              weekStartDate.getFullYear() !== listViewWeekStart.getFullYear() ||
+              weekStartDate.getMonth() !== listViewWeekStart.getMonth() ||
+              weekStartDate.getDate() !== listViewWeekStart.getDate()
+            ) {
+              return null;
+            }
+
             const weekDays = Array.from({ length: 5 }, (_, i) => 
               addDays(weekStart, i)
             ).filter(date => !isWeekend(date));
@@ -417,54 +495,70 @@ const Home = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {weekDays.map((date) => (
-                    <div 
-                      key={date.toISOString()}
-                      className="border rounded-lg p-4 bg-gray-50"
-                    >
-                      <div className="text-center mb-3">
-                        <div className="text-sm text-gray-600">
-                          {format(date, 'MM月dd日', { locale: zhCN })}
+                  {weekDays.map((date) => {
+                    // 获取当天的所有值日人员（包括额外值日人员）
+                    const extraMembers = extraDutyMembers
+                      .filter(em => em.date === date.toISOString())
+                      .map(em => {
+                        const memberGroup = groups.find(g => 
+                          g.members.some(m => m.id === em.memberId)
+                        );
+                        return memberGroup?.members.find(m => m.id === em.memberId);
+                      })
+                      .filter(Boolean);
+
+                    const allMembers = [...group.members, ...extraMembers];
+
+                    return (
+                      <div 
+                        key={date.toISOString()}
+                        className="border rounded-lg p-4 bg-gray-50"
+                      >
+                        <div className="text-center mb-3">
+                          <div className="text-sm text-gray-600">
+                            {format(date, 'MM月dd日', { locale: zhCN })}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {format(date, 'EEEE', { locale: zhCN })}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {format(date, 'EEEE', { locale: zhCN })}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        {group.members.map((member) => {
-                          const attendance = getAttendanceStatus(member.id, date);
-                          
-                          return (
-                            <div 
-                              key={member.id}
-                              onClick={() => isAdmin && setSelectedMember({ member, date })}
-                              className={`flex items-center justify-between bg-white p-2 rounded shadow-sm ${
-                                isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''
-                              }`}
-                            >
-                              <span className="text-sm">{member.name}</span>
-                              <div className="flex items-center gap-2">
-                                {attendance?.penaltyDays ? (
-                                  <span className="text-xs text-[#ff2300]">
-                                    +{attendance.penaltyDays}天
-                                  </span>
-                                ) : null}
-                                <span 
-                                  className="w-2 h-2 rounded-full"
-                                  style={{
-                                    backgroundColor: attendance 
-                                      ? STATUS_COLORS[attendance.status]
-                                      : STATUS_COLORS.pending
-                                  }}
-                                />
+                        
+                        <div className="space-y-2">
+                          {allMembers.map((member) => {
+                            if (!member) return null;
+                            const attendance = getAttendanceStatus(member.id, date);
+                            
+                            return (
+                              <div 
+                                key={member.id}
+                                onClick={() => isAdmin && setSelectedMember({ member, date })}
+                                className={`flex items-center justify-between bg-white p-2 rounded shadow-sm ${
+                                  isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''
+                                }`}
+                              >
+                                <span className="text-sm">{member.name}</span>
+                                <div className="flex items-center gap-2">
+                                  {attendance?.penaltyDays ? (
+                                    <span className="text-xs text-[#ff2300]">
+                                      +{attendance.penaltyDays}天
+                                    </span>
+                                  ) : null}
+                                  <span 
+                                    className="w-2 h-2 rounded-full"
+                                    style={{
+                                      backgroundColor: attendance 
+                                        ? STATUS_COLORS[attendance.status]
+                                        : STATUS_COLORS.pending
+                                    }}
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
