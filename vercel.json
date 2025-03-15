@@ -1,15 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
   "github": {
     "silent": true
   },
-  "buildCommand": "next build",
   "cleanUrls": true,
   "regions": ["hnd1"],
   "headers": [

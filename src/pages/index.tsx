@@ -8,7 +8,7 @@ import { AttendanceStatus, STATUS_COLORS } from '@/types';
 import Link from 'next/link';
 import LoginModal from '@/components/LoginModal';
 import AddExtraDutyModal from '@/components/AddExtraDutyModal';
-import Calendar from '@/components/Calendar';
+import DutyCalendar from '@/components/DutyCalendar';
 import LowScoreWarning from '@/components/LowScoreWarning';
 
 const Home = () => {
@@ -405,7 +405,7 @@ const Home = () => {
       {/* 视图切换 */}
       {viewMode === 'calendar' ? (
         <div className="max-w-6xl mx-auto">
-          <Calendar
+          <DutyCalendar
             dutySchedule={dutySchedule}
             attendanceRecords={attendanceRecords}
             onSelectDate={(date) => {
