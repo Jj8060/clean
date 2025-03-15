@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_ENV=development next dev",
-    "build": "cross-env NODE_ENV=production next build",
-    "start": "cross-env NODE_ENV=production next start",
-    "lint": "next lint"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "clean": "rimraf .next out",
+    "prebuild": "npm run clean",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\""
   },
   "dependencies": {
     "@types/react-big-calendar": "^1.16.1",
@@ -21,11 +24,12 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
-    "cross-env": "^7.0.3",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.1.0",
     "postcss": "^8",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.0",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5",
-    "webpack": "^5.0.0",
-    "webpack-cli": "^5.0.0"
+    "typescript": "^5"
   }
 }

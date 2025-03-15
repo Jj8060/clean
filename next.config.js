@@ -2,36 +2,30 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  // 优化构建输出
   output: 'standalone',
-  // 优化图片域名
   images: {
-    domains: [],
     unoptimized: true
   },
-  // 优化构建性能
   webpack: (config, { dev, isServer }) => {
-    // 生产环境优化
-    if (!dev) {
+    if (!dev && !isServer) {
       config.optimization = {
         ...config.optimization,
         minimize: true,
         splitChunks: {
           chunks: 'all',
           cacheGroups: {
-            default: false,
-            vendors: false,
-            commons: {
-              name: 'commons',
+            vendors: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
               chunks: 'all',
-              minChunks: 2,
-            },
-          },
-        },
+              priority: 10
+            }
+          }
+        }
       }
     }
     return config
-  },
+  }
 }
 
 module.exports = nextConfig 
