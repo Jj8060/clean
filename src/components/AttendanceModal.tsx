@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AttendanceStatus } from '@/types';
+import { groups } from '@/data/groups';
 
 interface AttendanceModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface AttendanceModalProps {
   currentStatus?: AttendanceStatus;
   onSave: (status: Partial<AttendanceStatus>) => void;
   readOnly?: boolean;
+  allMembers?: Array<{ id: string; name: string }>;
 }
 
 const AttendanceModal = ({
@@ -19,162 +21,198 @@ const AttendanceModal = ({
   currentStatus,
   onSave,
   readOnly = false,
+  allMembers = []
 }: AttendanceModalProps) => {
-  const [status, setStatus] = useState<AttendanceStatus['status']>(
+  const [status, setStatus] = useState<'present' | 'absent' | 'fail' | 'pending'>(
     currentStatus?.status || 'pending'
   );
-  const [score, setScore] = useState(currentStatus?.score || 7);
-  const [comment, setComment] = useState(currentStatus?.comment || '');
-  const [absentCount, setAbsentCount] = useState(currentStatus?.absentCount || 0);
-  const [failCount, setFailCount] = useState(currentStatus?.failCount || 0);
+  const [score, setScore] = useState<number>(currentStatus?.score || 0);
+  const [penaltyDays, setPenaltyDays] = useState<number>(currentStatus?.penaltyDays || 0);
+  const [isSubstituted, setIsSubstituted] = useState<boolean>(currentStatus?.isSubstituted || false);
+  const [substitutedBy, setSubstitutedBy] = useState<string>(currentStatus?.substitutedBy || '');
+  const [isExchanged, setIsExchanged] = useState<boolean>(currentStatus?.isExchanged || false);
+  const [exchangedWith, setExchangedWith] = useState<string>(currentStatus?.exchangedWith || '');
 
   if (!isOpen) return null;
 
-  // 计算惩罚天数
-  const calculatePenaltyDays = (newStatus: AttendanceStatus['status'], newScore: number) => {
-    let penaltyDays = 0;
-    
-    if (newStatus === 'absent') {
-      // 第一次缺勤2天，之后每次+3天
-      const newAbsentCount = absentCount + 1;
-      penaltyDays = 2 + (newAbsentCount - 1) * 3;
-      setAbsentCount(newAbsentCount);
-    } else if (newStatus === 'fail' || newScore < 6) {
-      // 不合格或分数低于6分，第一次1天，之后每次+2天
-      const newFailCount = failCount + 1;
-      penaltyDays = 1 + (newFailCount - 1) * 2;
-      // 如果分数低于3分，额外加1天惩罚
-      if (newScore < 3) {
-        penaltyDays += 1;
-      }
-      setFailCount(newFailCount);
-    }
-    
-    return penaltyDays;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const penaltyDays = calculatePenaltyDays(status, score);
+  const handleSave = () => {
     onSave({
-      memberId: member.id,
-      date: date.toISOString(),
       status,
       score,
-      comment,
       penaltyDays,
-      absentCount,
-      failCount
+      isSubstituted,
+      substitutedBy,
+      isExchanged,
+      exchangedWith
     });
     onClose();
   };
 
+  // 获取所有可选的成员（除了当前成员）
+  const availableMembers = allMembers.filter(m => m.id !== member.id);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-        <h2 className="text-xl font-bold mb-4">考勤详情</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block mb-1">值日人员</label>
-            <div className="p-2 bg-gray-100 rounded">{member.name}</div>
-          </div>
-          <div>
-            <label className="block mb-1">状态</label>
-            {readOnly ? (
-              <div className="p-2 bg-gray-100 rounded">
-                {status === 'present' ? '已到' :
-                 status === 'absent' ? '缺勤' :
-                 status === 'fail' ? '不合格' : '待评价'}
-              </div>
-            ) : (
+      <div className="bg-white rounded-lg p-6 w-[400px]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">{member.name} 的值日记录</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+        </div>
+
+        {!readOnly && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                出勤状态
+              </label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as AttendanceStatus['status'])}
-                className="w-full border p-2 rounded"
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full border rounded-md p-2"
               >
                 <option value="present">已到</option>
-                <option value="absent">缺勤</option>
+                <option value="absent">缺席</option>
                 <option value="fail">不合格</option>
-                <option value="pending">待评价</option>
+                <option value="pending">待定</option>
               </select>
-            )}
-          </div>
-          <div>
-            <label className="block mb-1">分数</label>
-            {readOnly ? (
-              <div className="p-2 bg-gray-100 rounded">
-                {score}分
-                {score < 6 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    分数低于6分将被视为不合格
-                  </p>
-                )}
-                {score < 3 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    分数低于3分将额外增加1天惩罚天数
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
-                <input
-                  type="number"
-                  value={score}
-                  onChange={(e) => setScore(Number(e.target.value))}
-                  className="w-full border p-2 rounded"
-                  min={1}
-                  max={10}
-                />
-                {score < 6 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    注意：分数低于6分将被视为不合格，会增加惩罚天数
-                  </p>
-                )}
-                {score < 3 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    注意：分数低于3分将额外增加1天惩罚天数
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-          {currentStatus?.comment && (
-            <div>
-              <label className="block mb-1">备注</label>
-              <div className="p-2 bg-gray-100 rounded whitespace-pre-wrap">
-                {currentStatus.comment}
-              </div>
             </div>
-          )}
-          {!readOnly && (
+
             <div>
-              <label className="block mb-1">添加备注</label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="w-full border p-2 rounded"
-                rows={3}
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                评分 (0-10)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={score}
+                onChange={(e) => setScore(Number(e.target.value))}
+                className="w-full border rounded-md p-2"
               />
             </div>
-          )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-            >
-              关闭
-            </button>
-            {!readOnly && (
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                惩罚天数
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={penaltyDays}
+                onChange={(e) => setPenaltyDays(Number(e.target.value))}
+                className="w-full border rounded-md p-2"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isSubstituted"
+                  checked={isSubstituted}
+                  onChange={(e) => {
+                    setIsSubstituted(e.target.checked);
+                    if (!e.target.checked) {
+                      setSubstitutedBy('');
+                    }
+                  }}
+                  className="mr-2"
+                />
+                <label htmlFor="isSubstituted" className="text-sm font-medium text-gray-700">
+                  代指
+                </label>
+              </div>
+
+              {isSubstituted && (
+                <div>
+                  <select
+                    value={substitutedBy}
+                    onChange={(e) => setSubstitutedBy(e.target.value)}
+                    className="w-full border rounded-md p-2"
+                  >
+                    <option value="">选择代指人</option>
+                    {availableMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isExchanged"
+                  checked={isExchanged}
+                  onChange={(e) => {
+                    setIsExchanged(e.target.checked);
+                    if (!e.target.checked) {
+                      setExchangedWith('');
+                    }
+                  }}
+                  className="mr-2"
+                />
+                <label htmlFor="isExchanged" className="text-sm font-medium text-gray-700">
+                  换值
+                </label>
+              </div>
+
+              {isExchanged && (
+                <div>
+                  <select
+                    value={exchangedWith}
+                    onChange={(e) => setExchangedWith(e.target.value)}
+                    className="w-full border rounded-md p-2"
+                  >
+                    <option value="">选择换值人</option>
+                    {availableMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-2 mt-4">
               <button
-                type="submit"
-                className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+                onClick={onClose}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
                 保存
               </button>
+            </div>
+          </div>
+        )}
+
+        {readOnly && (
+          <div className="space-y-2">
+            <p>出勤状态：{
+              status === 'present' ? '已到' :
+              status === 'absent' ? '缺席' :
+              status === 'fail' ? '不合格' : '待定'
+            }</p>
+            <p>评分：{score}</p>
+            {penaltyDays > 0 && <p>惩罚天数：{penaltyDays}</p>}
+            {isSubstituted && substitutedBy && (
+              <p>代指人：{allMembers.find(m => m.id === substitutedBy)?.name}</p>
+            )}
+            {isExchanged && exchangedWith && (
+              <p>换值人：{allMembers.find(m => m.id === exchangedWith)?.name}</p>
             )}
           </div>
-        </form>
+        )}
       </div>
     </div>
   );

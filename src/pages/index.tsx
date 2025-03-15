@@ -313,6 +313,46 @@ const Home = () => {
     localStorage.removeItem('attendanceRecords');
   };
 
+  // 添加代指和换值信息的显示组件
+  const SubstitutionInfo = ({ date, records }: { date: Date; records: AttendanceStatus[] }) => {
+    const substitutions = records.filter(r => 
+      (r.isSubstituted || r.isExchanged) && 
+      r.date === date.toISOString()
+    );
+
+    if (substitutions.length === 0) return null;
+
+    return (
+      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+        <h3 className="text-lg font-semibold mb-2">值日调整信息</h3>
+        <div className="space-y-2">
+          {substitutions.map(record => {
+            const member = groups.flatMap(g => g.members).find(m => m.id === record.memberId);
+            const substituteMember = groups.flatMap(g => g.members).find(m => 
+              m.id === (record.isSubstituted ? record.substitutedBy : record.exchangedWith)
+            );
+
+            if (!member || !substituteMember) return null;
+
+            return (
+              <div key={record.id} className="text-sm">
+                {record.isSubstituted ? (
+                  <p>{substituteMember.name} 代替 {member.name} 值日</p>
+                ) : (
+                  <p>{member.name} 与 {substituteMember.name} 换值</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const handleMemberClick = (member: any, date: Date) => {
+    setSelectedMember({ member, date });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-[#2a63b7]">
@@ -511,11 +551,14 @@ const Home = () => {
 
                     const allMembers = [...group.members, ...extraMembers];
 
+                    // 添加代指和换值信息的显示
                     return (
                       <div 
                         key={date.toISOString()}
                         className="border rounded-lg p-4 bg-gray-50"
                       >
+                        <SubstitutionInfo date={date} records={attendanceRecords} />
+                        
                         <div className="text-center mb-3">
                           <div className="text-sm text-gray-600">
                             {format(date, 'MM月dd日', { locale: zhCN })}
@@ -524,49 +567,64 @@ const Home = () => {
                             {format(date, 'EEEE', { locale: zhCN })}
                           </div>
                         </div>
-                        
+
                         <div className="space-y-2">
                           {allMembers.map((member) => {
                             if (!member) return null;
-                            const attendance = getAttendanceStatus(member.id, date);
                             
+                            const record = attendanceRecords.find(
+                              r => r.memberId === member.id && r.date === date.toISOString()
+                            );
+
+                            const isSubstituted = record?.isSubstituted;
+                            const isExchanged = record?.isExchanged;
+                            const substituteMember = groups.flatMap(g => g.members).find(m => 
+                              m.id === (isSubstituted ? record?.substitutedBy : record?.exchangedWith)
+                            );
+
                             return (
                               <div 
                                 key={member.id}
-                                onClick={() => setSelectedMember({ member, date })}
-                                className={`flex items-center justify-between bg-white p-2 rounded shadow-sm ${
-                                  'cursor-pointer hover:bg-gray-50'
-                                }`}
+                                className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm"
                               >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{member.name}</span>
-                                  <span className={`text-sm ${
-                                    (attendance?.score ?? 0) >= 8 ? 'text-[#00bd39]' :
-                                    (attendance?.score ?? 0) >= 6 ? 'text-[#ffa500]' :
-                                    attendance?.score ? 'text-[#ff2300]' : 'text-gray-400'
-                                  }`}>
-                                    {attendance?.score || '　'}
-                                  </span>
-                                  <span className="text-sm text-gray-500">
-                                    {attendance?.status === 'present' ? '正常出勤' :
-                                     attendance?.status === 'absent' ? '缺勤' :
-                                     attendance?.status === 'fail' ? '不合格' : '　'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {attendance?.penaltyDays ? (
-                                    <span className="text-xs text-[#ff2300]">
-                                      +{attendance.penaltyDays}天
+                                <div className="flex items-center space-x-2">
+                                  <span>{member.name}</span>
+                                  {(isSubstituted || isExchanged) && substituteMember && (
+                                    <span className="text-sm text-blue-600">
+                                      {isSubstituted ? 
+                                        `(由${substituteMember.name}代指)` : 
+                                        `(与${substituteMember.name}换值)`
+                                      }
                                     </span>
-                                  ) : null}
-                                  <span 
-                                    className="w-2 h-2 rounded-full"
-                                    style={{
-                                      backgroundColor: attendance 
-                                        ? STATUS_COLORS[attendance.status]
-                                        : STATUS_COLORS.pending
-                                    }}
-                                  />
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  {record && (
+                                    <div 
+                                      className={`w-2 h-2 rounded-full ${
+                                        record.status === 'present' ? 'bg-green-500' :
+                                        record.status === 'absent' ? 'bg-red-500' :
+                                        record.status === 'fail' ? 'bg-yellow-500' :
+                                        'bg-gray-500'
+                                      }`}
+                                    />
+                                  )}
+                                  {isAdmin ? (
+                                    <button
+                                      onClick={() => handleMemberClick(member, date)}
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      {record ? '修改' : '评价'}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleMemberClick(member, date)}
+                                      className="text-gray-600"
+                                    >
+                                      查看
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             );

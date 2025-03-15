@@ -21,6 +21,10 @@ export interface AttendanceStatus {
   penaltyDays?: number;
   absentCount?: number;  // 缺勤次数
   failCount?: number;    // 不合格次数
+  isSubstituted?: boolean; // 是否是代指
+  substitutedBy?: string; // 代指人的ID
+  isExchanged?: boolean; // 是否是换值
+  exchangedWith?: string; // 换值人的ID
 }
 
 export interface DutySchedule {
