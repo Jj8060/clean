@@ -4,12 +4,13 @@ import { format, eachWeekOfInterval, isWeekend, addDays, startOfMonth, endOfMont
 import { zhCN } from 'date-fns/locale';
 import AttendanceModal from '@/components/AttendanceModal';
 import CalendarView from '@/components/CalendarView';
-import { AttendanceStatus, STATUS_COLORS } from '@/types';
+import { AttendanceStatus, STATUS_COLORS, Member } from '@/types';
 import Link from 'next/link';
 import LoginModal from '@/components/LoginModal';
 import AddExtraDutyModal from '@/components/AddExtraDutyModal';
 import DutyCalendar from '@/components/DutyCalendar';
 import LowScoreWarning from '@/components/LowScoreWarning';
+import ChangePasswordModal from '@/components/ChangePasswordModal';
 
 const Home = () => {
   const [currentDate, setCurrentDate] = useState(new Date('2025-01-01'));
@@ -30,6 +31,8 @@ const Home = () => {
   }>>([]);
   const [showAddExtraDutyModal, setShowAddExtraDutyModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentUsername, setCurrentUsername] = useState('');
   
   // 从 localStorage 加载值日组更改记录
   useEffect(() => {
@@ -106,6 +109,9 @@ const Home = () => {
       const userData = JSON.parse(adminUser);
       setIsAdmin(true);
       setIsRootAdmin(userData.isRoot);
+      if (userData.username) {
+        setCurrentUsername(userData.username);
+      }
     }
   }, []);
 
@@ -230,11 +236,17 @@ const Home = () => {
     }
   };
 
-  // 修改登录处理
-  const handleLogin = (isRoot: boolean) => {
+  // 修改登录处理函数
+  const handleLogin = (isRoot: boolean, username?: string) => {
     setIsAdmin(true);
     setIsRootAdmin(isRoot);
-    localStorage.setItem('adminUser', JSON.stringify({ isRoot }));
+    if (username) {
+      setCurrentUsername(username);
+    }
+    localStorage.setItem('adminUser', JSON.stringify({ 
+      isRoot,
+      username: username || 'ZRWY'
+    }));
     setShowLoginModal(false);
   };
 
@@ -307,40 +319,73 @@ const Home = () => {
     );
   };
 
-  // 添加重置数据的函数
+  // 修改重置数据的函数
   const resetAllData = () => {
-    setAttendanceRecords([]);
-    localStorage.removeItem('attendanceRecords');
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    
+    setAttendanceRecords(prev => {
+      const filteredRecords = prev.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate < twentyMinutesAgo;
+      });
+      localStorage.setItem('attendanceRecords', JSON.stringify(filteredRecords));
+      return filteredRecords;
+    });
+
+    // 同样处理额外值日人员记录
+    setExtraDutyMembers(prev => {
+      const filteredMembers = prev.filter(member => {
+        const memberDate = new Date(member.date);
+        return memberDate < twentyMinutesAgo;
+      });
+      localStorage.setItem('extraDutyMembers', JSON.stringify(filteredMembers));
+      return filteredMembers;
+    });
+
+    // 同样处理值日组更改记录
+    const filteredOverrides = Object.entries(scheduleOverrides).reduce((acc, [key, value]) => {
+      const overrideDate = new Date(key);
+      if (overrideDate < twentyMinutesAgo) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as {[key: string]: string});
+    
+    setScheduleOverrides(filteredOverrides);
+    localStorage.setItem('scheduleOverrides', JSON.stringify(filteredOverrides));
   };
 
-  // 添加代指和换值信息的显示组件
+  // 修改 SubstitutionInfo 组件
   const SubstitutionInfo = ({ date, records }: { date: Date; records: AttendanceStatus[] }) => {
-    const substitutions = records.filter(r => 
-      (r.isSubstituted || r.isExchanged) && 
-      r.date === date.toISOString()
-    );
+    // 按代指人分组显示代指信息
+    const substitutionsBySubstitutor = records.reduce((acc, record) => {
+      if (record.substitutedBy) {
+        if (!acc[record.substitutedBy]) {
+          acc[record.substitutedBy] = [];
+        }
+        acc[record.substitutedBy].push(record);
+      }
+      return acc;
+    }, {} as { [key: string]: AttendanceStatus[] });
 
-    if (substitutions.length === 0) return null;
+    if (Object.keys(substitutionsBySubstitutor).length === 0) return null;
 
     return (
       <div className="mb-4 p-4 bg-blue-50 rounded-lg">
         <h3 className="text-lg font-semibold mb-2">值日调整信息</h3>
         <div className="space-y-2">
-          {substitutions.map(record => {
-            const member = groups.flatMap(g => g.members).find(m => m.id === record.memberId);
-            const substituteMember = groups.flatMap(g => g.members).find(m => 
-              m.id === (record.isSubstituted ? record.substitutedBy : record.exchangedWith)
-            );
+          {Object.entries(substitutionsBySubstitutor).map(([substitutorId, substitutions]) => {
+            const substitutor = groups.flatMap(g => g.members).find(m => m.id === substitutorId);
+            const substitutedMembers = substitutions.map(s => {
+              const member = groups.flatMap(g => g.members).find(m => m.id === s.memberId);
+              return member?.name;
+            }).filter(Boolean);
 
-            if (!member || !substituteMember) return null;
+            if (!substitutor || substitutedMembers.length === 0) return null;
 
             return (
-              <div key={record.id} className="text-sm">
-                {record.isSubstituted ? (
-                  <p>{substituteMember.name} 代替 {member.name} 值日</p>
-                ) : (
-                  <p>{member.name} 与 {substituteMember.name} 换值</p>
-                )}
+              <div key={substitutorId} className="text-sm">
+                <p>{substitutor.name} 代替 {substitutedMembers.join(', ')} 值日</p>
               </div>
             );
           })}
@@ -351,6 +396,50 @@ const Home = () => {
 
   const handleMemberClick = (member: any, date: Date) => {
     setSelectedMember({ member, date });
+  };
+
+  // 添加处理全体缺勤的函数
+  const handleGroupAbsent = (date: Date, members: Array<{ id: string; name: string }>) => {
+    const dateStr = date.toISOString();
+    
+    // 为每个成员创建缺勤记录
+    members.forEach(member => {
+      const newStatus: Partial<AttendanceStatus> = {
+        memberId: member.id,
+        date: dateStr,
+        status: 'absent',
+        score: 0,
+        penaltyDays: 3,
+        isGroupAbsent: true
+      };
+      handleAttendanceSave(newStatus);
+    });
+  };
+
+  // 添加处理重大活动的函数
+  const handleImportantEvent = (date: Date, members: Array<{ id: string; name: string }>) => {
+    const dateStr = date.toISOString();
+    
+    // 为每个成员创建重大活动记录
+    members.forEach(member => {
+      const newStatus: Partial<AttendanceStatus> = {
+        memberId: member.id,
+        date: dateStr,
+        status: 'pending',
+        score: 0,
+        isImportantEvent: true
+      };
+      handleAttendanceSave(newStatus);
+    });
+  };
+
+  // 添加删除额外值日人员的函数
+  const handleDeleteExtraDuty = (memberId: string, date: string) => {
+    const newExtraMembers = extraDutyMembers.filter(
+      member => !(member.memberId === memberId && member.date === date)
+    );
+    setExtraDutyMembers(newExtraMembers);
+    localStorage.setItem('extraDutyMembers', JSON.stringify(newExtraMembers));
   };
 
   return (
@@ -385,12 +474,22 @@ const Home = () => {
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Link
-              href="/statistics"
-              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-            >
-              考核统计
-            </Link>
+            <>
+              <Link
+                href="/statistics"
+                className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+              >
+                考核统计
+              </Link>
+              {!isRootAdmin && (
+                <button
+                  onClick={() => setShowChangePasswordModal(true)}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  修改密码
+                </button>
+              )}
+            </>
           )}
           {isRootAdmin && (
             <>
@@ -559,13 +658,33 @@ const Home = () => {
                       >
                         <SubstitutionInfo date={date} records={attendanceRecords} />
                         
-                        <div className="text-center mb-3">
-                          <div className="text-sm text-gray-600">
-                            {format(date, 'MM月dd日', { locale: zhCN })}
+                        <div className="text-center mb-3 flex items-center justify-center gap-2">
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              {format(date, 'MM月dd日', { locale: zhCN })}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {format(date, 'EEEE', { locale: zhCN })}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {format(date, 'EEEE', { locale: zhCN })}
-                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleGroupAbsent(date, allMembers.filter((m): m is Member => m !== undefined))}
+                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                                title="全体缺勤"
+                              >
+                                缺
+                              </button>
+                              <button
+                                onClick={() => handleImportantEvent(date, allMembers.filter((m): m is Member => m !== undefined))}
+                                className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
+                                title="重大活动"
+                              >
+                                活
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -575,6 +694,22 @@ const Home = () => {
                             const record = attendanceRecords.find(
                               r => r.memberId === member.id && r.date === date.toISOString()
                             );
+
+                            // 如果是重大活动日，显示特殊状态
+                            if (record?.isImportantEvent) {
+                              return (
+                                <div 
+                                  key={member.id}
+                                  className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <span>{member.name}</span>
+                                    <span className="text-sm text-purple-600">(重大活动)</span>
+                                  </div>
+                                  <div className="text-sm text-gray-500">失效</div>
+                                </div>
+                              );
+                            }
 
                             const isSubstituted = record?.isSubstituted;
                             const isExchanged = record?.isExchanged;
@@ -593,14 +728,17 @@ const Home = () => {
                                     <span className="text-sm text-blue-600">
                                       {isSubstituted ? 
                                         `(由${substituteMember.name}代指)` : 
-                                        `(与${substituteMember.name}换值)`
+                                        `(为${substituteMember.name}还值)`
                                       }
                                     </span>
+                                  )}
+                                  {record?.isGroupAbsent && (
+                                    <span className="text-sm text-red-600">(全体缺勤)</span>
                                   )}
                                 </div>
                                 
                                 <div className="flex items-center space-x-2">
-                                  {record && (
+                                  {record && !record.isImportantEvent && (
                                     <div 
                                       className={`w-2 h-2 rounded-full ${
                                         record.status === 'present' ? 'bg-green-500' :
@@ -610,21 +748,31 @@ const Home = () => {
                                       }`}
                                     />
                                   )}
-                                  {isAdmin ? (
-                                    <button
-                                      onClick={() => handleMemberClick(member, date)}
-                                      className="text-blue-600 hover:text-blue-800"
-                                    >
-                                      {record ? '修改' : '评价'}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleMemberClick(member, date)}
-                                      className="text-gray-600"
-                                    >
-                                      查看
-                                    </button>
-                                  )}
+                                  <div className="flex gap-2">
+                                    {isAdmin && !group.members.some(m => m.id === member.id) && (
+                                      <button
+                                        onClick={() => handleDeleteExtraDuty(member.id, date.toISOString())}
+                                        className="text-red-600 hover:text-red-800"
+                                      >
+                                        删除
+                                      </button>
+                                    )}
+                                    {isAdmin ? (
+                                      <button
+                                        onClick={() => handleMemberClick(member, date)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                      >
+                                        {record && !record.isImportantEvent ? '修改' : '评价'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleMemberClick(member, date)}
+                                        className="text-gray-600"
+                                      >
+                                        查看
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -653,6 +801,8 @@ const Home = () => {
           )}
           onSave={handleAttendanceSave}
           readOnly={!isAdmin}
+          attendanceRecords={attendanceRecords}
+          allMembers={groups.flatMap(g => g.members)}
         />
       )}
 
@@ -672,6 +822,13 @@ const Home = () => {
           date={selectedDate}
         />
       )}
+
+      {/* 修改密码弹窗 */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        currentUsername={currentUsername}
+      />
     </div>
   );
 };

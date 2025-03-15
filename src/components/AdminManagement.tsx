@@ -7,6 +7,7 @@ export const AdminManagement = () => {
   const [newPassword, setNewPassword] = useState('');
   const [admins, setAdmins] = useState<Admin[]>(getAllAdmins());
   const [showPassword, setShowPassword] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState<{[key: string]: boolean}>({});
   const [error, setError] = useState('');
 
   const handleAddAdmin = (e: React.FormEvent) => {
@@ -27,6 +28,13 @@ export const AdminManagement = () => {
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const toggleAdminPassword = (username: string) => {
+    setShowAdminPassword(prev => ({
+      ...prev,
+      [username]: !prev[username]
+    }));
   };
 
   return (
@@ -90,6 +98,18 @@ export const AdminManagement = () => {
                 <div className="font-medium">{admin.username}</div>
                 <div className="text-sm text-gray-500">
                   创建时间：{new Date(admin.createdAt || '').toLocaleString()}
+                </div>
+                <div className="text-sm mt-1 flex items-center gap-2">
+                  <span className="text-gray-500">密码：</span>
+                  <span className="font-mono">
+                    {showAdminPassword[admin.username] ? admin.password : '••••••'}
+                  </span>
+                  <button
+                    onClick={() => toggleAdminPassword(admin.username)}
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    {showAdminPassword[admin.username] ? '隐藏' : '显示'}
+                  </button>
                 </div>
               </div>
               <button

@@ -25,6 +25,10 @@ export interface AttendanceStatus {
   substitutedBy?: string; // 代指人的ID
   isExchanged?: boolean; // 是否是换值
   exchangedWith?: string; // 换值人的ID
+  substitutionCount?: number; // 代指次数
+  substitutedFor?: string[]; // 代替谁值日的记录
+  isImportantEvent?: boolean; // 是否是重大活动日
+  isGroupAbsent?: boolean; // 是否是全体缺勤日
 }
 
 export interface DutySchedule {

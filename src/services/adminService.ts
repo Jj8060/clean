@@ -26,7 +26,7 @@ export const verifyLogin = (username: string, password: string): { isValid: bool
   
   // 检查是否是普通管理员
   const savedAdmins = loadAdmins();
-  const admin = savedAdmins.find(a => a.username === username && a.password === password);
+  const admin = savedAdmins.find((a: Admin) => a.username === username && a.password === password);
   return { isValid: !!admin, isRoot: false };
 };
 
@@ -35,7 +35,7 @@ export const addAdmin = (newAdmin: Omit<Admin, 'isRoot' | 'createdAt'>) => {
   const savedAdmins = loadAdmins();
   
   // 检查是否已存在相同用户名
-  if (savedAdmins.some(admin => admin.username === newAdmin.username)) {
+  if (savedAdmins.some((admin: Admin) => admin.username === newAdmin.username)) {
     throw new Error('该用户名已存在');
   }
 
@@ -53,7 +53,7 @@ export const addAdmin = (newAdmin: Omit<Admin, 'isRoot' | 'createdAt'>) => {
 // 删除管理员
 export const removeAdmin = (username: string) => {
   const savedAdmins = loadAdmins();
-  const filteredAdmins = savedAdmins.filter(admin => admin.username !== username);
+  const filteredAdmins = savedAdmins.filter((admin: Admin) => admin.username !== username);
   saveAdmins(filteredAdmins);
   return true;
 };

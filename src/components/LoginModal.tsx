@@ -1,28 +1,39 @@
-import { useState } from 'react';
-import { verifyLogin } from '@/services/adminService';
+import { useState, useEffect } from 'react';
+import { Admin } from '@/types';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (isRoot: boolean) => void;
+  onLogin: (isRoot: boolean, username?: string) => void;
 }
 
 const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const result = verifyLogin(username, password);
-    
-    if (result.isValid) {
-      onLogin(result.isRoot);
+  // 清除输入信息
+  useEffect(() => {
+    if (!isOpen) {
       setUsername('');
       setPassword('');
       setError('');
-      onClose();
+    }
+  }, [isOpen]);
+
+  const handleLogin = () => {
+    // 检查是否是终端管理员
+    if (username === 'ZRWY' && password === 'good luck') {
+      onLogin(true);
+      return;
+    }
+
+    // 检查普通管理员
+    const admins = JSON.parse(localStorage.getItem('admins') || '[]') as Admin[];
+    const admin = admins.find(a => a.username === username && a.password === password);
+    
+    if (admin) {
+      onLogin(false, username);
     } else {
       setError('用户名或密码错误');
     }
@@ -31,56 +42,45 @@ const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-        <h2 className="text-xl font-bold mb-4">管理员登录</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96">
+        <h2 className="text-xl font-semibold mb-4">管理员登录</h2>
+        <div className="space-y-4">
           <div>
-            <label className="block mb-1">用户名</label>
+            <label className="block text-sm font-medium text-gray-700">用户名</label>
             <input
               type="text"
               value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="w-full border p-2 rounded"
+              onChange={(e) => setUsername(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block mb-1">密码</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full border p-2 rounded"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
-              >
-                {showPassword ? "隐藏" : "显示"}
-              </button>
-            </div>
+            <label className="block text-sm font-medium text-gray-700">密码</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
           </div>
-          {error && (
-            <div className="text-red-500 text-sm">{error}</div>
-          )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border rounded"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded"
-            >
-              登录
-            </button>
-          </div>
-        </form>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+        </div>
+
+        <div className="mt-6 flex justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleLogin}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            登录
+          </button>
+        </div>
       </div>
     </div>
   );

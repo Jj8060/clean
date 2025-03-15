@@ -5,7 +5,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { AttendanceStatus, STATUS_COLORS } from '@/types';
 import { groups } from '@/data/groups';
 import { useState } from 'react';
-import DutyCalendar from './Calendar';
+import DutyCalendar from './DutyCalendar';
 
 const locales = {
   'zh-CN': zhCN,
