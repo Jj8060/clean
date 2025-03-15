@@ -536,7 +536,21 @@ const Home = () => {
                                   isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''
                                 }`}
                               >
-                                <span className="text-sm">{member.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{member.name}</span>
+                                  <span className={`text-sm ${
+                                    (attendance?.score ?? 0) >= 8 ? 'text-[#00bd39]' :
+                                    (attendance?.score ?? 0) >= 6 ? 'text-[#ffa500]' :
+                                    attendance?.score ? 'text-[#ff2300]' : 'text-gray-400'
+                                  }`}>
+                                    {attendance?.score || '　'}
+                                  </span>
+                                  <span className="text-sm text-gray-500">
+                                    {attendance?.status === 'present' ? '正常出勤' :
+                                     attendance?.status === 'absent' ? '缺勤' :
+                                     attendance?.status === 'fail' ? '不合格' : '　'}
+                                  </span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                   {attendance?.penaltyDays ? (
                                     <span className="text-xs text-[#ff2300]">

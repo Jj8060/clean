@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { format, isSameDay, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, addDays } from 'date-fns';
+import { format, isSameDay, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, addDays, getDay } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { useDutyStatuses } from '@/hooks/useDutyStatuses';
 import { Group, Member, AttendanceStatus } from '@/types';
 import { groups } from '@/data/groups';
@@ -105,38 +106,90 @@ const Calendar = ({
     }
   };
 
-  // 添加日历格子渲染逻辑
+  // 添加星期几的表头
+  const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+  // 修改日历格子渲染逻辑
   const renderCalendarDays = () => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    return days.map((day) => {
-      const isToday = isSameDay(day, today);
-      
-      // 查找对应的值日安排
-      const weekSchedule = dutySchedule.find(schedule => {
-        const scheduleWeekEnd = addDays(schedule.weekStart, 4);
-        return day >= schedule.weekStart && day <= scheduleWeekEnd;
-      });
+    // 获取月初是星期几（0-6，0代表周日）
+    let firstDayOfWeek = getDay(monthStart);
+    // 调整为周一为一周的第一天（1-7，7代表周日）
+    firstDayOfWeek = firstDayOfWeek === 0 ? 7 : firstDayOfWeek;
+    
+    // 创建前置空白格子
+    const emptyDays = Array(firstDayOfWeek - 1).fill(null);
 
-      const group = weekSchedule?.group || groups[0]; // 使用找到的值日组或默认第一组
+    return (
+      <>
+        {/* 渲染星期几表头 */}
+        {weekDays.map((day, index) => (
+          <div key={day} className="p-2 text-center font-bold border bg-gray-50">
+            {day}
+          </div>
+        ))}
+        
+        {/* 渲染空白格子 */}
+        {emptyDays.map((_, index) => (
+          <div key={`empty-${index}`} className="p-2 border bg-gray-100" />
+        ))}
 
-      return (
-        <DayCell
-          key={day.toISOString()}
-          date={day}
-          group={group}
-          members={group.members}
-          isToday={isToday}
-          data-today={isToday}
-        />
-      );
-    });
+        {/* 渲染日期格子 */}
+        {days.map((day) => {
+          const isToday = isSameDay(day, today);
+          
+          // 查找对应的值日安排
+          const weekSchedule = dutySchedule.find(schedule => {
+            const scheduleWeekEnd = addDays(schedule.weekStart, 4);
+            return day >= schedule.weekStart && day <= scheduleWeekEnd;
+          });
+
+          const group = weekSchedule?.group || groups[0];
+
+          return (
+            <DayCell
+              key={day.toISOString()}
+              date={day}
+              group={group}
+              members={group.members}
+              isToday={isToday}
+              data-today={isToday}
+            />
+          );
+        })}
+      </>
+    );
   };
 
   return (
     <div>
+      {/* 添加小组成员显示 */}
+      <div className="mb-6 grid grid-cols-4 gap-4">
+        {groups.map(group => (
+          <div key={group.id} className="bg-white p-4 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-2 text-[#2a63b7]">{group.name}</h3>
+            <div className="space-y-1">
+              {group.members.map(member => {
+                const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
+                const totalPenaltyDays = memberRecords.reduce((sum, r) => sum + (r.penaltyDays || 0), 0);
+                
+                return (
+                  <div key={member.id} className="flex justify-between items-center text-sm">
+                    <span>{member.name}</span>
+                    <span className={`${totalPenaltyDays > 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                      {totalPenaltyDays}天
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <div className="space-x-2">
           <button 
