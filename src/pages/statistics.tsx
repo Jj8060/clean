@@ -73,21 +73,19 @@ const StatisticsPage = () => {
   useEffect(() => {
     const adminUser = localStorage.getItem('adminUser');
     if (!adminUser) {
-      router.push('/');
-    } else {
-      setIsAdmin(true);
-      // 加载考勤记录
-      const savedRecords = localStorage.getItem('attendanceRecords');
-      if (savedRecords) {
-        setAttendanceRecords(JSON.parse(savedRecords));
-      }
+      router.replace('/');
+      return;
+    }
+    setIsAdmin(true);
+    // 加载考勤记录
+    const savedRecords = localStorage.getItem('attendanceRecords');
+    if (savedRecords) {
+      setAttendanceRecords(JSON.parse(savedRecords));
     }
   }, [router]);
 
   if (!isAdmin) {
-    return <div className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
-      <div className="text-gray-600">加载中...</div>
-    </div>;
+    return null;
   }
 
   return (

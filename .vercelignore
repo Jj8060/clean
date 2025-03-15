@@ -1,0 +1,11 @@
+README.md
+.git
+.env.local
+node_modules
+.next/cache
+*.log
+.DS_Store
+.vscode
+.idea
+*.test.*
+coverage 

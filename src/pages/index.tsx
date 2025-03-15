@@ -344,12 +344,14 @@ const Home = () => {
           </button>
         </div>
         <div className="flex gap-2">
-          <Link
-            href="/statistics"
-            className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-          >
-            考核统计
-          </Link>
+          {isAdmin && (
+            <Link
+              href="/statistics"
+              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+            >
+              考核统计
+            </Link>
+          )}
           {isRootAdmin && (
             <>
               <Link
@@ -531,9 +533,9 @@ const Home = () => {
                             return (
                               <div 
                                 key={member.id}
-                                onClick={() => isAdmin && setSelectedMember({ member, date })}
+                                onClick={() => setSelectedMember({ member, date })}
                                 className={`flex items-center justify-between bg-white p-2 rounded shadow-sm ${
-                                  isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''
+                                  'cursor-pointer hover:bg-gray-50'
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
@@ -592,6 +594,7 @@ const Home = () => {
             selectedMember.date
           )}
           onSave={handleAttendanceSave}
+          readOnly={!isAdmin}
         />
       )}
 
