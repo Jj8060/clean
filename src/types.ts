@@ -19,6 +19,7 @@ export interface Admin {
   username: string;
   password: string;
   createdAt?: string;
+  isRoot: boolean;
 }
 
 export interface AttendanceStatus {
