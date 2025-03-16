@@ -8,13 +8,13 @@ interface LowScoreWarningProps {
 }
 
 const LowScoreWarning = ({ attendanceRecords, groups }: LowScoreWarningProps) => {
-  // 获取所有低分记录
+  // 获取所有低分记录（1-5分的记录）
   const lowScoreRecords = groups.flatMap(group =>
     group.members.map(member => {
       const memberRecords = attendanceRecords.filter(r => 
         r.memberId === member.id && 
-        r.score > 0 && // 排除0分记录
-        r.score < 6 // 只显示1-5分的记录
+        r.score >= 1 && // 只显示1分及以上的记录
+        r.score <= 5 // 只显示5分及以下的记录
       ).map(record => ({
         id: record.id,
         name: member.name,

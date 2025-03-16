@@ -4,7 +4,7 @@ import { format, eachWeekOfInterval, isWeekend, addDays, startOfMonth, endOfMont
 import { zhCN } from 'date-fns/locale';
 import AttendanceModal from '@/components/AttendanceModal';
 import CalendarView from '@/components/CalendarView';
-import { AttendanceStatus, STATUS_COLORS, Member } from '@/types';
+import { AttendanceStatus, STATUS_COLORS, Member, DutyMember } from '@/types';
 import Link from 'next/link';
 import LoginModal from '@/components/LoginModal';
 import AddExtraDutyModal from '@/components/AddExtraDutyModal';
@@ -328,37 +328,65 @@ const Home = () => {
   // 修改重置数据的函数
   const resetAllData = () => {
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
-    
+
+    // 检查是否有20分钟内的更改
+    const hasRecentChanges = attendanceRecords.some(record => {
+      const recordDate = new Date(record.date);
+      return recordDate > twentyMinutesAgo && record.score >= 1 && record.score <= 10;
+    }) || extraDutyMembers.some(member => {
+      const memberDate = new Date(member.date);
+      return memberDate > twentyMinutesAgo;
+    });
+
+    if (!hasRecentChanges) {
+      alert('只能重置最近20分钟内的更改');
+      return;
+    }
+
+    // 重置考勤记录（保留0分记录和20分钟前的记录）
     setAttendanceRecords(prev => {
-      const filteredRecords = prev.filter(record => {
+      const preservedRecords = prev.filter(record => {
         const recordDate = new Date(record.date);
-        return recordDate < twentyMinutesAgo;
+        // 保留以下记录：
+        // 1. 20分钟前的记录
+        // 2. 0分记录（管理员手动输入的占位符）
+        // 3. 超出1-10分范围的记录（这些记录不会影响惩罚系统）
+        return recordDate <= twentyMinutesAgo || 
+               record.score === 0 || 
+               record.score < 1 || 
+               record.score > 10;
       });
-      localStorage.setItem('attendanceRecords', JSON.stringify(filteredRecords));
-      return filteredRecords;
+      localStorage.setItem('attendanceRecords', JSON.stringify(preservedRecords));
+      return preservedRecords;
     });
 
-    // 同样处理额外值日人员记录
+    // 重置额外值日人员记录（仅20分钟内的）
     setExtraDutyMembers(prev => {
-      const filteredMembers = prev.filter(member => {
+      const preservedMembers = prev.filter(member => {
         const memberDate = new Date(member.date);
-        return memberDate < twentyMinutesAgo;
+        return memberDate <= twentyMinutesAgo;
       });
-      localStorage.setItem('extraDutyMembers', JSON.stringify(filteredMembers));
-      return filteredMembers;
+      localStorage.setItem('extraDutyMembers', JSON.stringify(preservedMembers));
+      return preservedMembers;
     });
 
-    // 同样处理值日组更改记录
-    const filteredOverrides = Object.entries(scheduleOverrides).reduce((acc, [key, value]) => {
-      const overrideDate = new Date(key);
-      if (overrideDate < twentyMinutesAgo) {
-        acc[key] = value;
+    // 重置值日组更改记录（仅20分钟内的）
+    const newScheduleOverrides = { ...scheduleOverrides };
+    let hasChanges = false;
+    Object.keys(newScheduleOverrides).forEach(dateKey => {
+      const overrideDate = new Date(dateKey);
+      if (overrideDate > twentyMinutesAgo) {
+        delete newScheduleOverrides[dateKey];
+        hasChanges = true;
       }
-      return acc;
-    }, {} as {[key: string]: string});
-    
-    setScheduleOverrides(filteredOverrides);
-    localStorage.setItem('scheduleOverrides', JSON.stringify(filteredOverrides));
+    });
+
+    if (hasChanges) {
+      setScheduleOverrides(newScheduleOverrides);
+      localStorage.setItem('scheduleOverrides', JSON.stringify(newScheduleOverrides));
+    }
+
+    // 注意：不重置管理员账户信息（adminUser）
   };
 
   // 修改 SubstitutionInfo 组件
@@ -404,36 +432,97 @@ const Home = () => {
     setSelectedMember({ member, date });
   };
 
-  // 添加处理全体缺勤的函数
-  const handleGroupAbsent = (date: Date, members: Array<{ id: string; name: string }>) => {
+  // 修改处理全体缺勤的函数
+  const handleGroupAbsent = (date: Date, members: DutyMember[]) => {
     const dateStr = date.toISOString();
     
-    // 为每个成员创建缺勤记录
-    members.forEach(member => {
-      const newStatus: Partial<AttendanceStatus> = {
-        memberId: member.id,
-        date: dateStr,
-        status: 'absent',
-        score: 0,
-        penaltyDays: 3,
-        isGroupAbsent: true
-      };
-      handleAttendanceSave(newStatus);
+    // 检查当天是否已经是全体缺勤状态
+    const isAlreadyAbsent = members.every(member => {
+      const record = attendanceRecords.find(
+        r => r.memberId === member.id && r.date === dateStr
+      );
+      return record?.isGroupAbsent;
     });
+
+    if (isAlreadyAbsent) {
+      // 如果已经是全体缺勤，则重置为待定状态
+      members.forEach(member => {
+        const newStatus: Partial<AttendanceStatus> = {
+          memberId: member.id,
+          date: dateStr,
+          status: 'pending',
+          score: 0,
+          isGroupAbsent: false
+        };
+        handleAttendanceSave(newStatus);
+      });
+    } else {
+      // 设置为全体缺勤状态
+      members.forEach(member => {
+        const newStatus: Partial<AttendanceStatus> = {
+          memberId: member.id,
+          date: dateStr,
+          status: 'absent',
+          score: 0,
+          penaltyDays: 3,
+          isGroupAbsent: true
+        };
+        handleAttendanceSave(newStatus);
+      });
+    }
   };
 
-  // 添加处理重大活动的函数
-  const handleImportantEvent = (date: Date, members: Array<{ id: string; name: string }>) => {
+  // 修改处理重大活动的函数
+  const handleImportantEvent = (date: Date, members: DutyMember[]) => {
     const dateStr = date.toISOString();
     
-    // 为每个成员创建重大活动记录
+    // 检查当天是否已经是重大活动状态
+    const isAlreadyImportantEvent = members.every(member => {
+      const record = attendanceRecords.find(
+        r => r.memberId === member.id && r.date === dateStr
+      );
+      return record?.isImportantEvent;
+    });
+
+    if (isAlreadyImportantEvent) {
+      // 如果已经是重大活动，则重置为待定状态
+      members.forEach(member => {
+        const newStatus: Partial<AttendanceStatus> = {
+          memberId: member.id,
+          date: dateStr,
+          status: 'pending',
+          score: 0,
+          isImportantEvent: false
+        };
+        handleAttendanceSave(newStatus);
+      });
+    } else {
+      // 设置为重大活动状态
+      members.forEach(member => {
+        const newStatus: Partial<AttendanceStatus> = {
+          memberId: member.id,
+          date: dateStr,
+          status: 'pending',
+          score: 0,
+          isImportantEvent: true
+        };
+        handleAttendanceSave(newStatus);
+      });
+    }
+  };
+
+  // 添加重置当天状态的函数
+  const handleResetDay = (date: Date, members: DutyMember[]) => {
+    const dateStr = date.toISOString();
+    
     members.forEach(member => {
       const newStatus: Partial<AttendanceStatus> = {
         memberId: member.id,
         date: dateStr,
         status: 'pending',
         score: 0,
-        isImportantEvent: true
+        isGroupAbsent: false,
+        isImportantEvent: false
       };
       handleAttendanceSave(newStatus);
     });
@@ -656,11 +745,18 @@ const Home = () => {
                           g.members.some(m => m.id === em.memberId)
                         );
                         const member = memberGroup?.members.find(m => m.id === em.memberId);
-                        return member ? { ...member, isExtra: true } : null;
+                        if (!member) return null;
+                        return {
+                          ...member,
+                          isExtra: true
+                        } as DutyMember;
                       })
-                      .filter(Boolean);
+                      .filter((m): m is DutyMember => m !== null);
 
-                    const regularMembers = group.members.map(member => ({ ...member, isExtra: false }));
+                    const regularMembers = group.members.map(member => ({
+                      ...member,
+                      isExtra: false
+                    } as DutyMember));
                     const allMembers = [...regularMembers, ...extraMembers];
 
                     // 添加代指和换值信息的显示
@@ -683,18 +779,57 @@ const Home = () => {
                           {isAdmin && (
                             <div className="flex gap-1">
                               <button
-                                onClick={() => handleGroupAbsent(date, allMembers.filter((m): m is Member => m !== undefined))}
-                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                                title="全体缺勤"
+                                onClick={() => handleGroupAbsent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                className={`px-2 py-1 text-xs ${
+                                  allMembers.every(m => 
+                                    attendanceRecords.find(r => 
+                                      r.memberId === m.id && 
+                                      r.date === date.toISOString() && 
+                                      r.isGroupAbsent
+                                    )
+                                  )
+                                    ? 'bg-gray-500'
+                                    : 'bg-red-500'
+                                } text-white rounded hover:bg-opacity-80`}
+                                title={allMembers.every(m => 
+                                  attendanceRecords.find(r => 
+                                    r.memberId === m.id && 
+                                    r.date === date.toISOString() && 
+                                    r.isGroupAbsent
+                                  )
+                                ) ? '取消全体缺勤' : '全体缺勤'}
                               >
                                 缺
                               </button>
                               <button
-                                onClick={() => handleImportantEvent(date, allMembers.filter((m): m is Member => m !== undefined))}
-                                className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
-                                title="重大活动"
+                                onClick={() => handleImportantEvent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                className={`px-2 py-1 text-xs ${
+                                  allMembers.every(m => 
+                                    attendanceRecords.find(r => 
+                                      r.memberId === m.id && 
+                                      r.date === date.toISOString() && 
+                                      r.isImportantEvent
+                                    )
+                                  )
+                                    ? 'bg-gray-500'
+                                    : 'bg-purple-500'
+                                } text-white rounded hover:bg-opacity-80`}
+                                title={allMembers.every(m => 
+                                  attendanceRecords.find(r => 
+                                    r.memberId === m.id && 
+                                    r.date === date.toISOString() && 
+                                    r.isImportantEvent
+                                  )
+                                ) ? '取消重大活动' : '重大活动'}
                               >
                                 活
+                              </button>
+                              <button
+                                onClick={() => handleResetDay(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                title="重置当天"
+                              >
+                                重
                               </button>
                             </div>
                           )}

@@ -12,6 +12,7 @@ interface AttendanceModalProps {
   readOnly?: boolean;
   allMembers?: Array<{ id: string; name: string }>;
   attendanceRecords: AttendanceStatus[];
+  isAdmin?: boolean;
 }
 
 const AttendanceModal = ({
@@ -23,7 +24,8 @@ const AttendanceModal = ({
   onSave,
   readOnly = false,
   allMembers = [],
-  attendanceRecords = []
+  attendanceRecords = [],
+  isAdmin = false
 }: AttendanceModalProps) => {
   const [status, setStatus] = useState<'present' | 'absent' | 'fail' | 'pending'>(
     currentStatus?.status || 'pending'
@@ -131,18 +133,38 @@ const AttendanceModal = ({
               </select>
             </div>
 
-            <div>
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                评分 (0-10)
+                评分 (1-10)
               </label>
               <input
                 type="number"
                 min="0"
                 max="10"
+                step="1"
                 value={score}
-                onChange={(e) => setScore(Number(e.target.value))}
-                className="w-full border rounded-md p-2"
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (value >= 0 && value <= 10) {
+                    setScore(value);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // 上下箭头键限制在1-10范围内
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setScore(prev => Math.min(10, Math.max(1, prev + 1)));
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setScore(prev => Math.min(10, Math.max(1, prev - 1)));
+                  }
+                }}
+                className="w-full px-3 py-2 border rounded-md"
+                placeholder="请输入0-10的分数"
               />
+              <p className="text-sm text-gray-500 mt-1">
+                使用上下箭头调整分数时，范围限制在1-10分之间
+              </p>
             </div>
 
             <div>
