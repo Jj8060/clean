@@ -271,12 +271,32 @@ const AttendanceModal = ({
 
         {readOnly && (
           <div className="space-y-2">
-            <p>出勤状态：{
-              status === 'present' ? '已到' :
-              status === 'absent' ? '缺席' :
-              status === 'fail' ? '不合格' : '待定'
-            }</p>
-            <p>评分：{score}</p>
+            <div className="flex items-center gap-2">
+              <div 
+                className={`w-2 h-2 rounded-full ${
+                  status === 'present' ? 'bg-green-500' :
+                  status === 'absent' ? 'bg-red-500' :
+                  status === 'fail' ? 'bg-yellow-500' :
+                  'bg-gray-500'
+                }`}
+              />
+              <p>出勤状态：{
+                status === 'present' ? '已到' :
+                status === 'absent' ? '缺席' :
+                status === 'fail' ? '不合格' : '待定'
+              }</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div 
+                className={`w-2 h-2 rounded-full ${
+                  score >= 8 ? 'bg-green-500' :
+                  score >= 6 ? 'bg-yellow-500' :
+                  score > 0 ? 'bg-red-500' :
+                  'bg-gray-500'
+                }`}
+              />
+              <p>评分：{score}</p>
+            </div>
             {penaltyDays > 0 && <p>惩罚天数：{penaltyDays}</p>}
             {isSubstituted && substitutedBy && (
               <p>代指人：{allMembers.find(m => m.id === substitutedBy)?.name}</p>
