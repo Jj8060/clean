@@ -76,10 +76,10 @@ const RecordDetailModal = ({
                 ) : null}
               </div>
 
-              {record.comment && (
+              {record.comment && record.comment.trim() !== '' && (
                 <div className="text-sm text-gray-600 mt-2">
                   <div className="font-medium mb-1">备注：</div>
-                  <div className="bg-gray-50 p-2 rounded">
+                  <div className="bg-gray-50 p-2 rounded whitespace-pre-wrap">
                     {record.comment}
                   </div>
                 </div>

@@ -9,6 +9,7 @@ export const AdminDutyForm = ({ memberId, date, onSubmit }: {
   const [status, setStatus] = useState<AttendanceStatus['status']>('present');
   const [score, setScore] = useState(10);
   const [penaltyDays, setPenaltyDays] = useState(0);
+  const [comment, setComment] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +19,8 @@ export const AdminDutyForm = ({ memberId, date, onSubmit }: {
       date,
       status,
       score,
-      penaltyDays: penaltyDays > 0 ? penaltyDays : undefined
+      penaltyDays: penaltyDays > 0 ? penaltyDays : undefined,
+      comment: comment.trim()
     });
   };
 
@@ -64,6 +66,18 @@ export const AdminDutyForm = ({ memberId, date, onSubmit }: {
           value={penaltyDays}
           onChange={e => setPenaltyDays(Math.max(0, parseInt(e.target.value) || 0))}
           className="w-full border p-2 rounded-md"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          备注
+        </label>
+        <textarea
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          placeholder="可选：添加备注信息"
+          className="w-full border p-2 rounded-md h-24 resize-none"
         />
       </div>
 
