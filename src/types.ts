@@ -36,6 +36,7 @@ export interface AttendanceStatus {
   exchangedWith?: string;
   substitutionCount?: number;
   substitutedFor?: string[];
+  comment?: string;
 }
 
 export const STATUS_COLORS = {
