@@ -15,6 +15,12 @@ export interface Group {
   members: Member[];
 }
 
+export interface Admin {
+  username: string;
+  password: string;
+  createdAt?: string;
+}
+
 export interface AttendanceStatus {
   id: string;
   memberId: string;
