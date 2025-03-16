@@ -16,7 +16,7 @@ interface CalendarProps {
     };
   }[];
   attendanceRecords: AttendanceStatus[];
-  onSelectDate: (date: Date) => void;
+  onDateSelect: (date: Date) => void;
   isAdmin: boolean;
   currentDate: Date;
   onUpdateSchedule?: (weekStart: Date, newGroupId: string) => void;
@@ -24,7 +24,10 @@ interface CalendarProps {
     memberId: string;
     date: string;
   }>;
-  onAddExtraDuty?: (date: Date) => void;
+  handleAddExtraDuty: (date: Date) => void;
+  handleDeleteExtraDuty: (memberId: string, date: string) => void;
+  isGroup4OnDuty: (date: Date) => boolean;
+  onGroupEvaluation: (date: Date, members: Member[]) => void;
 }
 
 const DayCell = ({ date, group, members, isToday }: { 
@@ -60,12 +63,15 @@ const DayCell = ({ date, group, members, isToday }: {
 const Calendar = ({
   dutySchedule,
   attendanceRecords,
-  onSelectDate,
+  onDateSelect,
   isAdmin,
   currentDate,
   onUpdateSchedule,
   extraDutyMembers,
-  onAddExtraDuty
+  handleAddExtraDuty,
+  handleDeleteExtraDuty,
+  isGroup4OnDuty,
+  onGroupEvaluation
 }: CalendarProps) => {
   const today = new Date();
 
@@ -81,7 +87,7 @@ const Calendar = ({
 
   const goToToday = () => {
     if (isDateInRange(today)) {
-      onSelectDate(today);
+      onDateSelect(today);
       // 这里需要添加滚动到今天的日期的逻辑
       const todayElement = document.querySelector('[data-today="true"]');
       if (todayElement) {
@@ -94,7 +100,7 @@ const Calendar = ({
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() - 1);
     if (isDateInRange(newDate)) {
-      onSelectDate(newDate);
+      onDateSelect(newDate);
     }
   };
 
@@ -102,7 +108,7 @@ const Calendar = ({
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + 1);
     if (isDateInRange(newDate)) {
-      onSelectDate(newDate);
+      onDateSelect(newDate);
     }
   };
 
@@ -115,49 +121,82 @@ const Calendar = ({
     const monthEnd = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    // 获取月初是星期几（0-6，0代表周日）
     let firstDayOfWeek = getDay(monthStart);
-    // 调整为周一为一周的第一天（1-7，7代表周日）
     firstDayOfWeek = firstDayOfWeek === 0 ? 7 : firstDayOfWeek;
     
-    // 创建前置空白格子
     const emptyDays = Array(firstDayOfWeek - 1).fill(null);
 
     return (
       <>
-        {/* 渲染星期几表头 */}
         {weekDays.map((day, index) => (
           <div key={day} className="p-2 text-center font-bold border bg-gray-50">
             {day}
           </div>
         ))}
         
-        {/* 渲染空白格子 */}
         {emptyDays.map((_, index) => (
           <div key={`empty-${index}`} className="p-2 border bg-gray-100" />
         ))}
 
-        {/* 渲染日期格子 */}
         {days.map((day) => {
           const isToday = isSameDay(day, today);
           
-          // 查找对应的值日安排
           const weekSchedule = dutySchedule.find(schedule => {
             const scheduleWeekEnd = addDays(schedule.weekStart, 4);
             return day >= schedule.weekStart && day <= scheduleWeekEnd;
           });
 
           const group = weekSchedule?.group || groups[0];
+          const extraMembers = extraDutyMembers.filter(
+            member => isSameDay(new Date(member.date), day)
+          );
+
+          // 合并常规值日人员和额外值日人员
+          const allMembers = [
+            ...group.members,
+            ...extraMembers.map(em => {
+              const member = groups.flatMap(g => g.members).find(m => m.id === em.memberId);
+              return member;
+            }).filter((m): m is Member => m !== undefined)
+          ];
 
           return (
-            <DayCell
+            <div
               key={day.toISOString()}
-              date={day}
-              group={group}
-              members={group.members}
-              isToday={isToday}
+              className={`p-2 border ${isToday ? 'bg-yellow-100' : ''} relative`}
               data-today={isToday}
-            />
+            >
+              <div className="flex justify-between items-center mb-2">
+                <div className="font-bold">{format(day, 'MM/dd')}</div>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGroupEvaluation(day, allMembers);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    评价
+                  </button>
+                )}
+              </div>
+              <div className="text-sm">{group.name}</div>
+              <div className="text-xs space-y-1">
+                {allMembers.map(member => {
+                  const status = attendanceRecords.find(
+                    r => r.memberId === member.id && isSameDay(new Date(r.date), day)
+                  );
+                  return (
+                    <div key={member.id} className="flex justify-between">
+                      <span>{member.name}</span>
+                      <span className="text-gray-500">
+                        {status ? `${status.status} (惩罚:${status.penaltyDays || 0}天)` : '待评价'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </>
@@ -194,21 +233,21 @@ const Calendar = ({
         <div className="space-x-2">
           <button 
             onClick={goToToday}
-            className="px-4 py-2 bg-blue-500 text-white rounded"
+            className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
             disabled={!isDateInRange(today)}
           >
             今天
           </button>
           <button 
             onClick={goToPreviousMonth}
-            className="px-4 py-2 bg-gray-200 rounded"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
             disabled={!isDateInRange(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
           >
             上个月
           </button>
           <button 
             onClick={goToNextMonth}
-            className="px-4 py-2 bg-gray-200 rounded"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
             disabled={!isDateInRange(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
           >
             下个月

@@ -33,6 +33,10 @@ const Home = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [currentUsername, setCurrentUsername] = useState('');
+  const [groupEvaluationMembers, setGroupEvaluationMembers] = useState<{
+    members: Member[];
+    date: Date;
+  } | null>(null);
   
   // 从 localStorage 加载值日组更改记录
   useEffect(() => {
@@ -115,6 +119,12 @@ const Home = () => {
     }
   }, []);
 
+  // 修改月份切换处理函数，避免触发评价页面
+  const handleDateSelect = (date: Date) => {
+    // 更新当前日期
+    setCurrentDate(date);
+  };
+
   // 处理年份选择
   const handleYearChange = (year: string) => {
     const newDate = new Date(currentDate);
@@ -163,17 +173,13 @@ const Home = () => {
     localStorage.removeItem('adminUser');
   };
 
-  // 处理日期选择（用于日历视图）
-  const handleDateSelect = (date: Date) => {
+  // 添加检查是否是第4组的函数
+  const isGroup4OnDuty = (date: Date) => {
     const weekSchedule = dutySchedule.find(schedule => {
       const scheduleWeekEnd = addDays(schedule.weekStart, 4);
       return date >= schedule.weekStart && date <= scheduleWeekEnd;
     });
-
-    if (weekSchedule) {
-      const member = weekSchedule.group.members[0]; // 默认选择第一个成员
-      setSelectedMember({ member, date });
-    }
+    return weekSchedule?.group.id === '4';
   };
 
   // 处理值日组更改
@@ -442,6 +448,11 @@ const Home = () => {
     localStorage.setItem('extraDutyMembers', JSON.stringify(newExtraMembers));
   };
 
+  // 添加群组评价处理函数
+  const handleGroupEvaluation = (date: Date, members: Member[]) => {
+    setGroupEvaluationMembers({ members, date });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-[#2a63b7]">
@@ -545,17 +556,17 @@ const Home = () => {
       {viewMode === 'calendar' ? (
         <div className="max-w-6xl mx-auto">
           <DutyCalendar
+            currentDate={currentDate}
             dutySchedule={dutySchedule}
             attendanceRecords={attendanceRecords}
-            onSelectDate={(date) => {
-              setCurrentDate(date);
-              handleDateSelect(date);
-            }}
-            isAdmin={isAdmin}
-            currentDate={currentDate}
-            onUpdateSchedule={isAdmin ? handleUpdateSchedule : undefined}
             extraDutyMembers={extraDutyMembers}
-            onAddExtraDuty={isAdmin ? handleAddExtraDuty : undefined}
+            onDateSelect={handleDateSelect}
+            isAdmin={isAdmin}
+            onUpdateSchedule={handleUpdateSchedule}
+            handleAddExtraDuty={handleAddExtraDuty}
+            handleDeleteExtraDuty={handleDeleteExtraDuty}
+            isGroup4OnDuty={isGroup4OnDuty}
+            onGroupEvaluation={handleGroupEvaluation}
           />
         </div>
       ) : (
@@ -644,11 +655,13 @@ const Home = () => {
                         const memberGroup = groups.find(g => 
                           g.members.some(m => m.id === em.memberId)
                         );
-                        return memberGroup?.members.find(m => m.id === em.memberId);
+                        const member = memberGroup?.members.find(m => m.id === em.memberId);
+                        return member ? { ...member, isExtra: true } : null;
                       })
                       .filter(Boolean);
 
-                    const allMembers = [...group.members, ...extraMembers];
+                    const regularMembers = group.members.map(member => ({ ...member, isExtra: false }));
+                    const allMembers = [...regularMembers, ...extraMembers];
 
                     // 添加代指和换值信息的显示
                     return (
@@ -719,7 +732,7 @@ const Home = () => {
 
                             return (
                               <div 
-                                key={member.id}
+                                key={member.id + (member.isExtra ? '-extra' : '')}
                                 className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm"
                               >
                                 <div className="flex items-center space-x-2">
@@ -735,6 +748,9 @@ const Home = () => {
                                   {record?.isGroupAbsent && (
                                     <span className="text-sm text-red-600">(全体缺勤)</span>
                                   )}
+                                  {member.isExtra && regularMembers.some(rm => rm.id === member.id) && (
+                                    <span className="text-sm text-orange-600">(额外添加)</span>
+                                  )}
                                 </div>
                                 
                                 <div className="flex items-center space-x-2">
@@ -749,7 +765,7 @@ const Home = () => {
                                     />
                                   )}
                                   <div className="flex gap-2">
-                                    {isAdmin && !group.members.some(m => m.id === member.id) && (
+                                    {isAdmin && member.isExtra && (
                                       <button
                                         onClick={() => handleDeleteExtraDuty(member.id, date.toISOString())}
                                         className="text-red-600 hover:text-red-800"
@@ -829,6 +845,43 @@ const Home = () => {
         onClose={() => setShowChangePasswordModal(false)}
         currentUsername={currentUsername}
       />
+
+      {/* 添加群组评价弹窗 */}
+      {groupEvaluationMembers && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">
+                {format(groupEvaluationMembers.date, 'yyyy年MM月dd日')} 值日评价
+              </h2>
+              <button
+                onClick={() => setGroupEvaluationMembers(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                关闭
+              </button>
+            </div>
+            <div className="space-y-4">
+              {groupEvaluationMembers.members.map(member => (
+                <div key={member.id} className="border rounded-lg p-4">
+                  <div className="font-medium mb-2">{member.name}</div>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        handleMemberClick(member, groupEvaluationMembers.date);
+                        setGroupEvaluationMembers(null);
+                      }}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      {getAttendanceStatus(member.id, groupEvaluationMembers.date) ? '修改评价' : '添加评价'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
