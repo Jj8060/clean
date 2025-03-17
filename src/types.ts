@@ -40,6 +40,9 @@ export interface AttendanceStatus {
   comment: string;
 }
 
+// 为了保持向后兼容，将 DutyStatus 设置为 AttendanceStatus 的别名
+export type DutyStatus = AttendanceStatus;
+
 export const STATUS_COLORS = {
   present: 'bg-green-500',
   absent: 'bg-red-500',
