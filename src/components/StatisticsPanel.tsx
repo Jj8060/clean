@@ -1,48 +1,68 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { Member, AttendanceStatus } from '@/types';
 import { dutyStatuses } from '@/data/dutyStatus';
-import { groups } from '@/data/groups';
 
-export const StatisticsPanel = () => {
-  const statistics = useMemo(() => {
-    const stats = new Map();
-    
-    groups.forEach(group => {
-      group.members.forEach(member => {
-        const memberStats = {
-          totalDuties: 0,
-          completedDuties: 0,
-          punishmentDays: member.currentPunishmentDays || 0,
-          score: 0
-        };
-        
-        const memberStatuses = dutyStatuses.filter(s => s.memberId === member.id);
-        memberStats.totalDuties = memberStatuses.length;
-        memberStats.completedDuties = memberStatuses.filter(s => s.status === '已完成').length;
-        
-        stats.set(member.id, memberStats);
-      });
+interface MemberStats {
+  completedDuties: number;
+  failedDuties: number;
+  absentDuties: number;
+  averageScore: number;
+}
+
+export const StatisticsPanel = ({ members }: { members: Member[] }) => {
+  const [stats, setStats] = useState<{ [key: string]: MemberStats }>({});
+
+  useEffect(() => {
+    const newStats: { [key: string]: MemberStats } = {};
+    members.forEach(member => {
+      const memberStatuses = dutyStatuses.filter(s => s.memberId === member.id);
+      const memberStats: MemberStats = {
+        completedDuties: memberStatuses.filter(s => s.status === 'present').length,
+        failedDuties: memberStatuses.filter(s => s.status === 'fail').length,
+        absentDuties: memberStatuses.filter(s => s.status === 'absent').length,
+        averageScore: memberStatuses.length > 0
+          ? memberStatuses.reduce((sum, s) => sum + s.score, 0) / memberStatuses.length
+          : 0
+      };
+      newStats[member.id] = memberStats;
     });
-    
-    return stats;
-  }, [dutyStatuses]);
+    setStats(newStats);
+  }, [members, dutyStatuses]);
 
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-lg font-bold mb-4">考核统计</h2>
-      {Array.from(statistics.entries()).map(([memberId, stats]) => {
-        const member = groups.find(g => g.members.find(m => m.id === memberId))?.members.find(m => m.id === memberId);
-        return (
-          <div key={memberId} className="mb-2">
-            <div className="flex justify-between">
-              <span>{member?.name}</span>
-              <span>完成率: {((stats.completedDuties / stats.totalDuties) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="text-sm text-gray-500">
-              惩罚天数: {stats.punishmentDays}天
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold mb-4">值日统计</h2>
+      <div className="space-y-4">
+        {members.map(member => (
+          <div key={member.id} className="border-b pb-4">
+            <h3 className="font-medium mb-2">{member.name}</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">已完成值日：</span>
+                <span className="text-green-600">{stats[member.id]?.completedDuties || 0}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">不合格次数：</span>
+                <span className="text-yellow-600">{stats[member.id]?.failedDuties || 0}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">缺席次数：</span>
+                <span className="text-red-600">{stats[member.id]?.absentDuties || 0}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">平均分数：</span>
+                <span className={`font-medium ${
+                  (stats[member.id]?.averageScore || 0) >= 8 ? 'text-green-600' :
+                  (stats[member.id]?.averageScore || 0) >= 6 ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {(stats[member.id]?.averageScore || 0).toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }; 
