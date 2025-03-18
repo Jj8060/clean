@@ -30,7 +30,7 @@ const AttendanceModal = ({
   const [status, setStatus] = useState<'present' | 'absent' | 'fail' | 'pending'>(
     currentStatus?.status || 'pending'
   );
-  const [score, setScore] = useState<number>(currentStatus?.score || 0);
+  const [score, setScore] = useState<number | null>(currentStatus?.score ?? null);
   const [penaltyDays, setPenaltyDays] = useState<number>(currentStatus?.penaltyDays || 0);
   const [isSubstituted, setIsSubstituted] = useState<boolean>(currentStatus?.isSubstituted || false);
   const [substitutedBy, setSubstitutedBy] = useState<string>(currentStatus?.substitutedBy || '');
@@ -56,14 +56,44 @@ const AttendanceModal = ({
   if (!isOpen) return null;
 
   const handleSave = () => {
-    const newStatus: Partial<AttendanceStatus> = {
+    // 添加调试信息
+    console.log('保存值日记录:', {
+      memberId: member.id, 
+      date: date.toISOString(),
       status,
-      score: isSubstituted ? 0 : score, // 如果是被代指，分数记为0
+      score,
+      penaltyDays,
+      currentStatus
+    });
+    
+    // 根据考勤状态设置默认分数
+    let finalScore = score;
+    
+    if (status === 'absent') {
+      // 缺勤默认0分
+      finalScore = 0;
+    } else if (status === 'fail') {
+      // 不合格检查分数，如果未设置则默认5分
+      finalScore = finalScore === null ? 5 : finalScore;
+    } else if (status === 'present') {
+      // 出勤检查分数，如果未设置则默认8分
+      finalScore = finalScore === null ? 8 : finalScore;
+    }
+    
+    const newStatus: Partial<AttendanceStatus> = {
+      memberId: member.id,
+      date: date.toISOString(),
+      status,
+      score: isSubstituted ? 0 : finalScore,
       penaltyDays,
       isSubstituted,
       substitutedBy,
       isExchanged,
-      exchangedWith
+      exchangedWith,
+      // 保留原有的重要标记，除非明确要修改
+      isGroupAbsent: currentStatus?.isGroupAbsent === true ? false : undefined, 
+      isImportantEvent: currentStatus?.isImportantEvent === true ? false : undefined,
+      comment: ''
     };
 
     // 如果是代指，更新代指人的记录
@@ -73,10 +103,11 @@ const AttendanceModal = ({
         memberId: substitutedBy,
         date: date.toISOString(),
         status: 'present',
-        score,
+        score: finalScore,
         penaltyDays: 2, // 代指自动罚值2天
         substitutionCount: (currentStatus?.substitutionCount || 0) + 1,
-        substitutedFor: [...(currentStatus?.substitutedFor || []), member.id]
+        substitutedFor: [...(currentStatus?.substitutedFor || []), member.id],
+        comment: ''
       };
       onSave(substitutorStatus);
     }
@@ -142,28 +173,36 @@ const AttendanceModal = ({
                 min="0"
                 max="10"
                 step="1"
-                value={score}
+                value={score === null ? '' : score}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (value >= 0 && value <= 10) {
-                    setScore(value);
+                  const inputValue = e.target.value;
+                  if (inputValue === '') {
+                    setScore(null);
+                  } else {
+                    const value = parseInt(inputValue);
+                    if ((value >= 0 && value <= 10) || inputValue === '0') {
+                      setScore(value);
+                    }
                   }
                 }}
                 onKeyDown={(e) => {
-                  // 上下箭头键限制在1-10范围内
+                  // 上下箭头键调整范围包括0-10
                   if (e.key === 'ArrowUp') {
                     e.preventDefault();
-                    setScore(prev => Math.min(10, Math.max(1, prev + 1)));
+                    setScore(prev => Math.min(10, Math.max(0, (prev || 0) + 1)));
                   } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    setScore(prev => Math.min(10, Math.max(1, prev - 1)));
+                    setScore(prev => {
+                      if (prev === null) return 0;
+                      return Math.max(0, prev - 1);
+                    });
                   }
                 }}
                 className="w-full px-3 py-2 border rounded-md"
                 placeholder="请输入0-10的分数"
               />
               <p className="text-sm text-gray-500 mt-1">
-                使用上下箭头调整分数时，范围限制在1-10分之间
+                使用上下箭头调整分数时，范围限制在0-10分之间
               </p>
             </div>
 
@@ -289,13 +328,13 @@ const AttendanceModal = ({
             <div className="flex items-center gap-2">
               <div 
                 className={`w-2 h-2 rounded-full ${
-                  score >= 8 ? 'bg-green-500' :
-                  score >= 6 ? 'bg-yellow-500' :
-                  score > 0 ? 'bg-red-500' :
+                  score && score >= 8 ? 'bg-green-500' :
+                  score && score >= 6 ? 'bg-yellow-500' :
+                  score && score > 0 ? 'bg-red-500' :
                   'bg-gray-500'
                 }`}
               />
-              <p>评分：{score}</p>
+              <p>评分：{score === null ? '未评分' : score}</p>
             </div>
             {penaltyDays > 0 && <p>惩罚天数：{penaltyDays}</p>}
             {isSubstituted && substitutedBy && (

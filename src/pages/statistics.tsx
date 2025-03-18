@@ -5,35 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import RecordDetailModal from '@/components/RecordDetailModal';
 
-// 添加低分预警组件
-const LowScoreWarning = ({ statistics }: { statistics: any[] }) => {
-  const lowScoreMembers = statistics.filter(stat => Number(stat.averageScore) < 6);
-  
-  if (lowScoreMembers.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6 overflow-hidden">
-      <div className="animate-marquee whitespace-nowrap">
-        {lowScoreMembers.map(member => (
-          <span
-            key={member.id}
-            className={`inline-block mr-8 ${
-              Number(member.averageScore) < 3 
-                ? 'text-red-500 font-bold'
-                : 'text-yellow-500 font-semibold'
-            }`}
-          >
-            {member.name}: {member.averageScore}分
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const StatisticsPage = () => {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isRootAdmin, setIsRootAdmin] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceStatus[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [selectedMemberRecords, setSelectedMemberRecords] = useState<{
@@ -76,13 +51,37 @@ const StatisticsPage = () => {
       router.replace('/');
       return;
     }
+    const userData = JSON.parse(adminUser);
     setIsAdmin(true);
+    setIsRootAdmin(!!userData.isRoot);
+    
     // 加载考勤记录
     const savedRecords = localStorage.getItem('attendanceRecords');
     if (savedRecords) {
       setAttendanceRecords(JSON.parse(savedRecords));
     }
   }, [router]);
+
+  // 处理删除记录的函数
+  const handleDeleteRecord = (recordId: string) => {
+    // 如果不是终端管理员则不允许删除
+    if (!isRootAdmin) return;
+    
+    // 从记录中删除选中的记录
+    const newRecords = attendanceRecords.filter(record => record.id !== recordId);
+    setAttendanceRecords(newRecords);
+    
+    // 保存到localStorage
+    localStorage.setItem('attendanceRecords', JSON.stringify(newRecords));
+    
+    // 更新选中的成员记录
+    if (selectedMemberRecords) {
+      setSelectedMemberRecords({
+        ...selectedMemberRecords,
+        records: selectedMemberRecords.records.filter(record => record.id !== recordId)
+      });
+    }
+  };
 
   if (!isAdmin) {
     return null;
@@ -93,31 +92,41 @@ const StatisticsPage = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-[#2a63b7]">值日考核统计</h1>
-          <Link 
-            href="/"
-            className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-          >
-            返回排班表
-          </Link>
+          <div className="flex gap-3">
+            {isRootAdmin && (
+              <button
+                onClick={() => {
+                  if (window.confirm('确定清空所有考核记录吗？此操作不可恢复！')) {
+                    setAttendanceRecords([]);
+                    localStorage.setItem('attendanceRecords', JSON.stringify([]));
+                  }
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                清空所有记录
+              </button>
+            )}
+            <Link 
+              href="/"
+              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+            >
+              返回排班表
+            </Link>
+          </div>
         </div>
-
-        {/* 低分预警显示 */}
-        <LowScoreWarning statistics={statistics} />
 
         {/* 筛选器 */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="flex items-center gap-4">
             <span className="text-gray-600">选择组别：</span>
-            <select
+            <select 
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
               className="border rounded px-3 py-1.5"
             >
-              <option value="all">全部组别</option>
+              <option value="all">全部</option>
               {groups.map(group => (
-                <option key={group.id} value={group.name}>
-                  {group.name}
-                </option>
+                <option key={group.id} value={group.name}>{group.name}</option>
               ))}
             </select>
           </div>
@@ -131,12 +140,12 @@ const StatisticsPage = () => {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">组别</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">成员</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">平均分</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">出勤情况</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">考勤情况</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">惩罚天数</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">详细记录</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y">
               {statistics.map((stat) => (
                 <tr key={stat.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">{stat.groupName}</td>
@@ -198,6 +207,7 @@ const StatisticsPage = () => {
           onClose={() => setSelectedMemberRecords(null)}
           records={selectedMemberRecords.records}
           memberName={selectedMemberRecords.memberName}
+          onDeleteRecord={isRootAdmin ? handleDeleteRecord : undefined}
         />
       )}
     </div>

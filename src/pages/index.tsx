@@ -12,6 +12,64 @@ import DutyCalendar from '@/components/DutyCalendar';
 import LowScoreWarning from '@/components/LowScoreWarning';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 
+// 添加低分预警组件
+const LowScoreMarquee = ({ statistics }: { statistics: any[] }) => {
+  // 只考虑有评分且分数小于6且大于0的成员
+  const lowScoreMembers = statistics.filter(stat => 
+    Number(stat.averageScore) > 0 && 
+    Number(stat.averageScore) < 6 && 
+    stat.averageScore !== '-' && 
+    stat.records.some((r: any) => r.score !== null && r.score > 0)
+  );
+  
+  if (lowScoreMembers.length === 0) return null;
+
+  // 为每个成员找出最近的低分记录
+  const membersWithRecentLowScores = lowScoreMembers.map(member => {
+    // 筛选出有效的低分记录（分数小于6且大于0的记录）
+    const lowScoreRecords = member.records.filter((r: any) => 
+      r.score !== null && r.score > 0 && r.score < 6
+    );
+    
+    // 按日期排序，找出最近的记录
+    const sortedRecords = lowScoreRecords.sort(
+      (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
+    const recentLowScore = sortedRecords[0];
+    
+    return {
+      ...member,
+      recentLowScoreDate: recentLowScore ? new Date(recentLowScore.date) : null
+    };
+  }).filter(member => member.recentLowScoreDate !== null);
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6 overflow-hidden">
+      <div className="animate-marquee whitespace-nowrap">
+        {membersWithRecentLowScores.map(member => (
+          <span
+            key={member.id}
+            className={`inline-block mr-8 ${
+              Number(member.averageScore) < 3 
+                ? 'text-red-500 font-bold'
+                : 'text-yellow-500 font-semibold'
+            }`}
+          >
+            {member.name}: {member.averageScore}分
+            {member.recentLowScoreDate && (
+              <span className="ml-1">
+                ({member.recentLowScoreDate.getMonth() + 1}月
+                {member.recentLowScoreDate.getDate()}日不合格)
+              </span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Home = () => {
   const [currentDate, setCurrentDate] = useState(new Date('2025-01-01'));
   const [listViewDate, setListViewDate] = useState(new Date('2025-01-01'));
@@ -141,6 +199,8 @@ const Home = () => {
 
   // 修改 handleAttendanceSave 函数
   const handleAttendanceSave = (status: Partial<AttendanceStatus>) => {
+    console.log('Saving attendance status:', status);
+    
     setAttendanceRecords(prev => {
       const existingIndex = prev.findIndex(
         r => r.memberId === status.memberId && r.date === status.date
@@ -148,14 +208,42 @@ const Home = () => {
       
       let newRecords;
       if (existingIndex >= 0) {
+        // 如果记录已存在，更新它但保留其ID
         newRecords = [...prev];
-        newRecords[existingIndex] = { ...newRecords[existingIndex], ...status } as AttendanceStatus;
+        // 确保ID被保留
+        const recordId = newRecords[existingIndex].id;
+        
+        // 添加调试信息
+        console.log('Updating existing record:', {
+          old: newRecords[existingIndex],
+          new: { ...status }
+        });
+        
+        // 确保isGroupAbsent状态被正确处理
+        newRecords[existingIndex] = { 
+          ...newRecords[existingIndex], 
+          ...status,
+          id: recordId,
+          // 只有当明确设置为false时才更新isGroupAbsent，否则保持原值
+          isGroupAbsent: status.isGroupAbsent !== undefined ? status.isGroupAbsent : newRecords[existingIndex].isGroupAbsent
+        } as AttendanceStatus;
       } else {
-        newRecords = [...prev, { id: Date.now().toString(), ...status } as AttendanceStatus];
+        // 如果记录不存在，创建新记录
+        const newRecord = { 
+          id: Date.now().toString(), 
+          ...status,
+          // 确保comment字段存在
+          comment: status.comment || ''
+        } as AttendanceStatus;
+        
+        console.log('Creating new record:', newRecord);
+        
+        newRecords = [...prev, newRecord];
       }
       
       // 保存到 localStorage
       localStorage.setItem('attendanceRecords', JSON.stringify(newRecords));
+      
       return newRecords;
     });
   };
@@ -542,6 +630,37 @@ const Home = () => {
     setGroupEvaluationMembers({ members, date });
   };
 
+  // 计算统计数据 - 修改函数
+  const statistics = (() => {
+    const stats = groups.flatMap(group => 
+      group.members.map(member => {
+        const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
+        
+        // 计算有效记录（score不为null且大于0的记录）
+        const validRecords = memberRecords.filter(r => r.score !== null && r.score > 0);
+        const averageScore = validRecords.length 
+          ? (validRecords.reduce((sum, r) => sum + (r.score || 0), 0) / validRecords.length).toFixed(1)
+          : '-';
+        
+        return {
+          id: member.id,
+          name: member.name,
+          groupName: group.name,
+          totalPenaltyDays: memberRecords.reduce((sum, r) => sum + (r.penaltyDays || 0), 0),
+          averageScore,
+          attendanceCount: {
+            present: memberRecords.filter(r => r.status === 'present').length,
+            absent: memberRecords.filter(r => r.status === 'absent').length,
+            fail: memberRecords.filter(r => r.status === 'fail').length,
+          },
+          records: memberRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        };
+      })
+    );
+
+    return stats;
+  })();
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-[#2a63b7]">
@@ -669,10 +788,7 @@ const Home = () => {
           </div>
 
           {/* 低分预警显示 - 移动到这里 */}
-          <LowScoreWarning 
-            attendanceRecords={attendanceRecords}
-            groups={groups}
-          />
+          <LowScoreMarquee statistics={statistics} />
 
           {/* 当前周的值日安排 */}
           {dutySchedule.map(({ weekStart, group }) => {

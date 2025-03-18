@@ -27,7 +27,7 @@ export interface AttendanceStatus {
   memberId: string;
   date: string;
   status: 'present' | 'absent' | 'fail' | 'pending';
-  score: number;
+  score: number | null;
   penaltyDays?: number;
   isGroupAbsent?: boolean;
   isImportantEvent?: boolean;
