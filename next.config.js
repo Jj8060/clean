@@ -123,15 +123,6 @@ const offlineConfig = {
   generateInDevMode: false,
   // 在没有网络的情况下只使用离线缓存
   generateSw: true,
-  // 解析离线页面
-  async rewrites() {
-    return [
-      {
-        source: '/vercel/:path*',
-        destination: '/404.html',
-      },
-    ];
-  },
 };
 
 module.exports = withPlugins([

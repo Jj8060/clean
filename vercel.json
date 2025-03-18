@@ -73,16 +73,14 @@
       "use": "@vercel/next"
     }
   ],
-  "routes": [
-    {
-      "src": "/vercel/(.*)",
-      "status": 404,
-      "dest": "/404.html"
+  "rewrites": [
+    { 
+      "source": "/vercel/(.*)", 
+      "destination": "/404.html" 
     },
-    {
-      "src": "/(.*\\.js\\.map)",
-      "status": 404,
-      "dest": "/404.html"
+    { 
+      "source": "/(.*\\.js\\.map)", 
+      "destination": "/404.html" 
     }
   ]
 } 
