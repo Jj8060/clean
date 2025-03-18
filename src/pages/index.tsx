@@ -668,7 +668,7 @@ const Home = () => {
             />
           </div>
 
-          {/* 低分预警显示 */}
+          {/* 低分预警显示 - 移动到这里 */}
           <LowScoreWarning 
             attendanceRecords={attendanceRecords}
             groups={groups}

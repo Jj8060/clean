@@ -24,6 +24,11 @@ const nextConfig = {
       }
     }
     return config
+  },
+  // 禁用默认PWA功能
+  pwa: {
+    disable: true,
+    dest: 'public'
   }
 }
 

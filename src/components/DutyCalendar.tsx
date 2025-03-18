@@ -30,6 +30,67 @@ interface CalendarProps {
   onGroupEvaluation: (date: Date, members: Member[]) => void;
 }
 
+// 添加惩罚天数调整对话框组件
+const AdjustPenaltyModal = ({ 
+  isOpen, 
+  onClose, 
+  member, 
+  totalPenaltyDays, 
+  onAdjust 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  member: Member; 
+  totalPenaltyDays: number;
+  onAdjust: (memberId: string, newPenaltyDays: number) => void;
+}) => {
+  const [penaltyDays, setPenaltyDays] = useState(totalPenaltyDays);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg p-6 w-80">
+        <h3 className="text-lg font-semibold mb-4 text-[#2a63b7]">调整惩罚天数</h3>
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-1">成员: {member.name}</label>
+          <label className="block text-gray-700 mb-1">当前惩罚天数: {totalPenaltyDays}天</label>
+          <label className="block text-gray-700 mb-1">
+            新惩罚天数:
+            <input 
+              type="number" 
+              min="0"
+              value={penaltyDays} 
+              onChange={(e) => setPenaltyDays(parseInt(e.target.value) || 0)}
+              className="ml-2 px-2 py-1 border rounded w-16"
+            />
+          </label>
+          <p className="text-xs text-gray-500 mt-1">
+            注意: 此修改不会影响考核统计记录，仅调整显示天数
+          </p>
+        </div>
+        <div className="flex justify-end space-x-2">
+          <button 
+            onClick={onClose} 
+            className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
+          >
+            取消
+          </button>
+          <button 
+            onClick={() => {
+              onAdjust(member.id, penaltyDays);
+              onClose();
+            }} 
+            className="px-3 py-1 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DayCell = ({ date, group, members, isToday }: { 
   date: Date, 
   group: Group, 
@@ -59,7 +120,7 @@ const DayCell = ({ date, group, members, isToday }: {
   );
 };
 
-// 添加 Props 类型
+// 修改 Calendar 组件
 const Calendar = ({
   dutySchedule,
   attendanceRecords,
@@ -74,6 +135,25 @@ const Calendar = ({
   onGroupEvaluation
 }: CalendarProps) => {
   const today = new Date();
+  // 新增状态管理选中的成员和对话框显示
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [memberPenaltyOverrides, setMemberPenaltyOverrides] = useState<{[key: string]: number}>({});
+
+  // 加载已保存的惩罚天数覆盖记录
+  useEffect(() => {
+    const savedOverrides = localStorage.getItem('penaltyDaysOverrides');
+    if (savedOverrides) {
+      setMemberPenaltyOverrides(JSON.parse(savedOverrides));
+    }
+  }, []);
+  
+  // 调整惩罚天数的处理函数
+  const handleAdjustPenalty = (memberId: string, newPenaltyDays: number) => {
+    const newOverrides = { ...memberPenaltyOverrides, [memberId]: newPenaltyDays };
+    setMemberPenaltyOverrides(newOverrides);
+    localStorage.setItem('penaltyDaysOverrides', JSON.stringify(newOverrides));
+  };
 
   // 设置日期范围限制
   const dateRange = {
@@ -274,14 +354,32 @@ const Calendar = ({
             <div className="space-y-1">
               {group.members.map(member => {
                 const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
-                const totalPenaltyDays = memberRecords.reduce((sum, r) => sum + (r.penaltyDays || 0), 0);
+                const totalPenaltyDays = memberPenaltyOverrides[member.id] !== undefined ? 
+                  memberPenaltyOverrides[member.id] : 
+                  memberRecords.reduce((sum, r) => sum + (r.penaltyDays || 0), 0);
                 
                 return (
                   <div key={member.id} className="flex justify-between items-center text-sm">
                     <span>{member.name}</span>
-                    <span className={`${totalPenaltyDays > 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                      {totalPenaltyDays}天
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`${totalPenaltyDays > 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                        {totalPenaltyDays}天
+                      </span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setSelectedMember(member);
+                            setShowAdjustModal(true);
+                          }}
+                          className="text-blue-500 hover:text-blue-700 text-xs ml-1"
+                          title="调整惩罚天数"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -289,6 +387,23 @@ const Calendar = ({
           </div>
         ))}
       </div>
+
+      {/* 惩罚天数调整对话框 */}
+      {selectedMember && (
+        <AdjustPenaltyModal
+          isOpen={showAdjustModal}
+          onClose={() => setShowAdjustModal(false)}
+          member={selectedMember}
+          totalPenaltyDays={
+            memberPenaltyOverrides[selectedMember.id] !== undefined ?
+            memberPenaltyOverrides[selectedMember.id] :
+            attendanceRecords
+              .filter(r => r.memberId === selectedMember.id)
+              .reduce((sum, r) => sum + (r.penaltyDays || 0), 0)
+          }
+          onAdjust={handleAdjustPenalty}
+        />
+      )}
 
       <div className="flex justify-between items-center mb-4">
         <div className="space-x-2">
