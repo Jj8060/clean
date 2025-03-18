@@ -187,16 +187,24 @@ const Home = () => {
 
   // 处理年份选择
   const handleYearChange = (year: string) => {
+    // 修复：使用完整的日期创建新日期对象，确保不会丢失日期信息
     const newDate = new Date(currentDate);
     newDate.setFullYear(parseInt(year));
+    // 先更新状态
     setCurrentDate(newDate);
+    // 然后显式调用日期选择函数，确保视图更新
+    handleDateSelect(newDate);
   };
 
   // 处理月份选择
   const handleMonthChange = (month: string) => {
+    // 修复：使用完整的日期创建新日期对象，确保不会丢失日期信息
     const newDate = new Date(currentDate);
     newDate.setMonth(parseInt(month));
+    // 先更新状态
     setCurrentDate(newDate);
+    // 然后显式调用日期选择函数，确保视图更新
+    handleDateSelect(newDate);
   };
 
   // 修改 handleAttendanceSave 函数

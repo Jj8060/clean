@@ -139,6 +139,17 @@ const Calendar = ({
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [memberPenaltyOverrides, setMemberPenaltyOverrides] = useState<{[key: string]: number}>({});
+  
+  // 添加状态来管理每天的选组显示状态
+  const [showGroupSelectDays, setShowGroupSelectDays] = useState<{[key: string]: boolean}>({});
+  
+  const toggleGroupSelect = (day: Date) => {
+    const dayKey = day.toISOString();
+    setShowGroupSelectDays(prev => ({
+      ...prev,
+      [dayKey]: !prev[dayKey]
+    }));
+  };
 
   // 加载已保存的惩罚天数覆盖记录
   useEffect(() => {
@@ -261,8 +272,9 @@ const Calendar = ({
           const weekDay = getDay(day);
           const isWeekend = weekDay === 0 || weekDay === 6;
           
-          // 对于周末，实现可选择值日小组的功能
-          const [showGroupSelect, setShowGroupSelect] = useState(false);
+          // 使用组件级别的状态，而不是在渲染函数内创建
+          const dayKey = day.toISOString();
+          const showGroupSelect = showGroupSelectDays[dayKey];
 
           return (
             <div
@@ -276,7 +288,7 @@ const Calendar = ({
                   <div className="flex gap-1">
                     {isWeekend && (
                       <button
-                        onClick={() => setShowGroupSelect(!showGroupSelect)}
+                        onClick={() => toggleGroupSelect(day)}
                         className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded hover:bg-blue-600"
                       >
                         {showGroupSelect ? '取消' : '选组'}
@@ -309,7 +321,7 @@ const Calendar = ({
                       weekStart.setHours(0, 0, 0, 0);
                       
                       onUpdateSchedule(weekStart, e.target.value);
-                      setShowGroupSelect(false);
+                      toggleGroupSelect(day);
                     }}
                   >
                     {groups.map((g) => (
@@ -430,7 +442,7 @@ const Calendar = ({
           </button>
         </div>
         <div className="text-xl font-bold">
-          {format(currentDate, 'yyyy年MM月')}
+          {format(currentDate, 'yyyy年MM月', { locale: zhCN })}
         </div>
       </div>
       <div className="grid grid-cols-7 gap-1">
