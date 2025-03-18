@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>清理Vercel缓存</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #2a63b7;
+    }
+    .message {
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .success {
+      background-color: #e6ffed;
+      border: 1px solid #34d058;
+    }
+    .info {
+      background-color: #f1f8ff;
+      border: 1px solid #2a63b7;
+    }
+    button {
+      background-color: #2a63b7;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #245091;
+    }
+    .steps {
+      margin-top: 20px;
+    }
+    .step {
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>清理Vercel缓存和弹窗</h1>
+  
+  <div class="message info">
+    此页面用于解决Vercel应用中的缓存问题和弹窗提示。
+  </div>
+  
+  <div class="steps">
+    <div class="step">
+      <h3>步骤1: 清除浏览器缓存</h3>
+      <button id="clearCacheBtn">清除网站缓存</button>
+      <p>这将清除与当前网站相关的浏览器缓存和存储。</p>
+    </div>
+    
+    <div class="step">
+      <h3>步骤2: 注销Service Worker</h3>
+      <button id="unregisterSWBtn">注销Service Worker</button>
+      <p>这将停止可能导致弹窗的后台服务。</p>
+    </div>
+    
+    <div class="step">
+      <h3>步骤3: 返回应用</h3>
+      <button id="returnToAppBtn">返回应用</button>
+      <p>清理完成后，点击此按钮返回应用。</p>
+    </div>
+  </div>
+  
+  <div id="result" class="message" style="display: none;"></div>
+  
+  <script>
+    // 显示结果消息
+    function showResult(message, isSuccess = true) {
+      const resultEl = document.getElementById('result');
+      resultEl.textContent = message;
+      resultEl.className = isSuccess ? 'message success' : 'message error';
+      resultEl.style.display = 'block';
+    }
+    
+    // 清除缓存
+    document.getElementById('clearCacheBtn').addEventListener('click', async () => {
+      try {
+        // 清除localStorage
+        localStorage.clear();
+        
+        // 清除sessionStorage
+        sessionStorage.clear();
+        
+        // 清除缓存存储
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+        }
+        
+        // 清除IndexedDB
+        const databases = await window.indexedDB.databases();
+        databases.forEach(db => {
+          window.indexedDB.deleteDatabase(db.name);
+        });
+        
+        showResult('缓存清除成功！');
+      } catch (err) {
+        console.error('清除缓存失败:', err);
+        showResult('清除缓存失败: ' + err.message, false);
+      }
+    });
+    
+    // 注销Service Worker
+    document.getElementById('unregisterSWBtn').addEventListener('click', async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(reg => reg.unregister()));
+          
+          if (registrations.length > 0) {
+            showResult(`成功注销 ${registrations.length} 个Service Worker！`);
+          } else {
+            showResult('没有找到活动的Service Worker。');
+          }
+        } else {
+          showResult('此浏览器不支持Service Worker。');
+        }
+      } catch (err) {
+        console.error('注销Service Worker失败:', err);
+        showResult('注销Service Worker失败: ' + err.message, false);
+      }
+    });
+    
+    // 返回应用
+    document.getElementById('returnToAppBtn').addEventListener('click', () => {
+      const baseUrl = window.location.origin;
+      window.location.href = baseUrl + '/?nocache=' + Date.now();
+    });
+    
+    // 自动检测service worker
+    (async function() {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        if (registrations.length > 0) {
+          document.getElementById('unregisterSWBtn').textContent = 
+            `注销Service Worker (${registrations.length}个活动)`;
+        }
+      }
+    })();
+  </script>
+</body>
+</html> 
