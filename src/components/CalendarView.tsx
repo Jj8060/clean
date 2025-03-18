@@ -365,13 +365,14 @@ const CalendarView = ({
       const isWeekend = i >= 5;
       
       if (isWeekend) {
-        // 周末只创建一个空的事件容器
+        // 周末默认使用当前周的值日组
         weekEvents.push({
           id: `${currentDay.toISOString()}-weekend`,
           title: '周末值日',
           start: currentDay,
           end: currentDay,
           isWeekend: true,
+          group, // 添加与周一到周五相同的值日组
           records: [],
         });
       } else {
@@ -402,7 +403,7 @@ const CalendarView = ({
   });
 
   // 自定义事件渲染组件
-  const WeekendEvent = ({ event, isAdmin, extraDutyMembers, onAddExtraDuty }: any) => {
+  const WeekendEvent = ({ event, isAdmin, extraDutyMembers, onAddExtraDuty, onUpdateSchedule }: any) => {
     // 获取当前日期的额外值日人员
     const currentDateExtraMembers = extraDutyMembers?.filter((m: ExtraDutyMember) => {
       const eventDate = new Date(event.start);
@@ -424,15 +425,70 @@ const CalendarView = ({
       };
     });
 
+    // 添加状态管理周末选择的值日组
+    const [showGroupSelect, setShowGroupSelect] = useState(false);
+    const eventDate = new Date(event.start);
+    
+    // 查找本周的周一对应的weekStart
+    const weekStartDate = new Date(eventDate);
+    const dayOfWeek = eventDate.getDay(); // 0是周日，6是周六
+    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    weekStartDate.setDate(weekStartDate.getDate() - daysToSubtract);
+    weekStartDate.setHours(0, 0, 0, 0);
+
     return (
       <div className="p-2 h-full bg-gray-50">
-        <div className="font-bold text-base mb-2 text-gray-500">
-          {format(event.start, 'EEEE', { locale: zhCN })}值日
+        <div className="flex justify-between items-center mb-2">
+          <div className="font-bold text-base text-gray-500">
+            {format(event.start, 'EEEE', { locale: zhCN })}值日
+          </div>
+          {isAdmin && (
+            <button 
+              onClick={() => setShowGroupSelect(!showGroupSelect)}
+              className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+            >
+              {showGroupSelect ? '取消' : '选择值日组'}
+            </button>
+          )}
         </div>
+
+        {/* 显示当前值日组信息 */}
+        {event.group && (
+          <div className="mb-2 p-2 bg-white rounded border border-gray-200">
+            <div className="text-sm font-medium">{event.group.name}</div>
+            <div className="text-xs text-gray-500">
+              {event.group.members.map((member: any) => (
+                <div key={member.id}>{member.name}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 值日组选择器 */}
+        {isAdmin && showGroupSelect && onUpdateSchedule && (
+          <div className="mb-3">
+            <select
+              className="w-full text-sm p-1 border rounded"
+              value={event.group?.id || ''}
+              onChange={(e) => {
+                const newGroupId = e.target.value;
+                onUpdateSchedule(weekStartDate, newGroupId);
+                setShowGroupSelect(false);
+              }}
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* 值日人员列表 */}
         {extraMemberDetails.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-1 mt-2">
+            <div className="text-xs font-medium text-gray-600 mb-1">额外值日人员:</div>
             {extraMemberDetails.map(({ member, group }: ExtraMemberDetail) => (
               member && (
                 <div 
@@ -563,6 +619,7 @@ const CalendarView = ({
                 isAdmin={isAdmin}
                 extraDutyMembers={extraDutyMembers}
                 onAddExtraDuty={onAddExtraDuty}
+                onUpdateSchedule={onUpdateSchedule}
               />
             ) : (
               <CustomEvent

@@ -142,8 +142,25 @@ const Calendar = ({
           const isToday = isSameDay(day, today);
           
           const weekSchedule = dutySchedule.find(schedule => {
-            const scheduleWeekEnd = addDays(schedule.weekStart, 4);
-            return day >= schedule.weekStart && day <= scheduleWeekEnd;
+            // 修改查找逻辑，使周末也能找到对应的周一到周五的值日组
+            const weekDay = getDay(day);
+            const isWeekend = weekDay === 0 || weekDay === 6; // 0是周日，6是周六
+            
+            if (isWeekend) {
+              // 对于周末，查找该周的周一到周五对应的值日组
+              // 计算回到本周一的日期
+              const weekStart = new Date(day);
+              const daysToSubtract = weekDay === 0 ? 6 : weekDay - 1;
+              weekStart.setDate(weekStart.getDate() - daysToSubtract);
+              weekStart.setHours(0, 0, 0, 0);
+              
+              // 查找对应的值日安排
+              return isSameDay(schedule.weekStart, weekStart);
+            } else {
+              // 对于工作日，保持原有逻辑
+              const scheduleWeekEnd = addDays(schedule.weekStart, 4);
+              return day >= schedule.weekStart && day <= scheduleWeekEnd;
+            }
           });
 
           const group = weekSchedule?.group || groups[0];
@@ -160,6 +177,13 @@ const Calendar = ({
             }).filter((m): m is Member => m !== undefined)
           ];
 
+          // 判断是否为周末
+          const weekDay = getDay(day);
+          const isWeekend = weekDay === 0 || weekDay === 6;
+          
+          // 对于周末，实现可选择值日小组的功能
+          const [showGroupSelect, setShowGroupSelect] = useState(false);
+
           return (
             <div
               key={day.toISOString()}
@@ -169,17 +193,54 @@ const Calendar = ({
               <div className="flex justify-between items-center mb-2">
                 <div className="font-bold">{format(day, 'MM/dd')}</div>
                 {isAdmin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGroupEvaluation(day, allMembers);
-                    }}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    评价
-                  </button>
+                  <div className="flex gap-1">
+                    {isWeekend && (
+                      <button
+                        onClick={() => setShowGroupSelect(!showGroupSelect)}
+                        className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded hover:bg-blue-600"
+                      >
+                        {showGroupSelect ? '取消' : '选组'}
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onGroupEvaluation(day, allMembers);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      评价
+                    </button>
+                  </div>
                 )}
               </div>
+              
+              {/* 对于周末，添加值日组选择器 */}
+              {isWeekend && isAdmin && showGroupSelect && onUpdateSchedule && (
+                <div className="mb-2">
+                  <select
+                    className="w-full text-xs p-1 border rounded"
+                    value={group.id}
+                    onChange={(e) => {
+                      // 查找对应的周一
+                      const weekStart = new Date(day);
+                      const daysToSubtract = weekDay === 0 ? 6 : weekDay - 1;
+                      weekStart.setDate(weekStart.getDate() - daysToSubtract);
+                      weekStart.setHours(0, 0, 0, 0);
+                      
+                      onUpdateSchedule(weekStart, e.target.value);
+                      setShowGroupSelect(false);
+                    }}
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
               <div className="text-sm">{group.name}</div>
               <div className="text-xs space-y-1">
                 {allMembers.map(member => {
