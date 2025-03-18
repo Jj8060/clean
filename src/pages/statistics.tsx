@@ -22,14 +22,26 @@ const StatisticsPage = () => {
       group.members.map(member => {
         const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
         
+        // 计算有效记录和惩罚天数（只考虑有效记录）
+        const validRecords = memberRecords.filter(r => r.score !== null && r.score > 0);
+        const totalPenaltyDays = memberRecords.reduce((sum, r) => {
+          // 只有评分>0且<4时才计算惩罚天数
+          if (r.score !== null && r.score > 0 && r.score < 4) {
+            return sum + (r.penaltyDays || 0);
+          }
+          return sum;
+        }, 0);
+        
+        const averageScore = validRecords.length 
+          ? (validRecords.reduce((sum, r) => sum + (r.score || 0), 0) / validRecords.length).toFixed(1)
+          : '-';
+        
         return {
           id: member.id,
           name: member.name,
           groupName: group.name,
-          totalPenaltyDays: memberRecords.reduce((sum, r) => sum + (r.penaltyDays || 0), 0),
-          averageScore: memberRecords.length 
-            ? (memberRecords.reduce((sum, r) => sum + r.score, 0) / memberRecords.length).toFixed(1)
-            : '-',
+          totalPenaltyDays: totalPenaltyDays,
+          averageScore,
           attendanceCount: {
             present: memberRecords.filter(r => r.status === 'present').length,
             absent: memberRecords.filter(r => r.status === 'absent').length,

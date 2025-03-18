@@ -68,16 +68,41 @@ const AttendanceModal = ({
     
     // 根据考勤状态设置默认分数
     let finalScore = score;
+    let finalPenaltyDays = penaltyDays;
     
     if (status === 'absent') {
       // 缺勤默认0分
       finalScore = 0;
+      // 缺勤的惩罚天数保持不变
     } else if (status === 'fail') {
       // 不合格检查分数，如果未设置则默认5分
       finalScore = finalScore === null ? 5 : finalScore;
+      
+      // 只有当分数大于0且小于4时才设置惩罚天数
+      if (finalScore > 0 && finalScore < 4) {
+        // 如果用户没有手动设置惩罚天数，则根据分数自动设置
+        if (finalPenaltyDays === 0) {
+          if (finalScore === 1) finalPenaltyDays = 3;
+          else if (finalScore === 2) finalPenaltyDays = 2;
+          else if (finalScore === 3) finalPenaltyDays = 1;
+        }
+      } else if (finalScore === 0) {
+        // 0分无需惩罚
+        finalPenaltyDays = 0;
+      }
     } else if (status === 'present') {
       // 出勤检查分数，如果未设置则默认8分
       finalScore = finalScore === null ? 8 : finalScore;
+      
+      // 如果出勤但分数低于4分且大于0，设置惩罚天数
+      if (finalScore > 0 && finalScore < 4 && finalPenaltyDays === 0) {
+        if (finalScore === 1) finalPenaltyDays = 3;
+        else if (finalScore === 2) finalPenaltyDays = 2;
+        else if (finalScore === 3) finalPenaltyDays = 1;
+      } else if (finalScore === 0) {
+        // 0分无需惩罚
+        finalPenaltyDays = 0;
+      }
     }
     
     const newStatus: Partial<AttendanceStatus> = {
@@ -85,7 +110,7 @@ const AttendanceModal = ({
       date: date.toISOString(),
       status,
       score: isSubstituted ? 0 : finalScore,
-      penaltyDays,
+      penaltyDays: finalPenaltyDays,
       isSubstituted,
       substitutedBy,
       isExchanged,

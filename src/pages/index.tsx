@@ -160,7 +160,9 @@ const Home = () => {
     if (savedRecords) {
       setAttendanceRecords(JSON.parse(savedRecords));
     } else {
-      resetAllData();
+      // 初始化空数组
+      setAttendanceRecords([]);
+      localStorage.setItem('attendanceRecords', JSON.stringify([]));
     }
   }, []);
 
@@ -540,6 +542,7 @@ const Home = () => {
           date: dateStr,
           status: 'pending',
           score: 0,
+          penaltyDays: 0, // 确保重置惩罚天数为0
           isGroupAbsent: false
         };
         handleAttendanceSave(newStatus);
@@ -599,20 +602,20 @@ const Home = () => {
     }
   };
 
-  // 添加重置当天状态的函数
+  // 修改重置当天状态的函数，完全删除记录
   const handleResetDay = (date: Date, members: DutyMember[]) => {
     const dateStr = date.toISOString();
     
-    members.forEach(member => {
-      const newStatus: Partial<AttendanceStatus> = {
-        memberId: member.id,
-        date: dateStr,
-        status: 'pending',
-        score: 0,
-        isGroupAbsent: false,
-        isImportantEvent: false
-      };
-      handleAttendanceSave(newStatus);
+    // 从考勤记录中删除该日期的所有记录
+    setAttendanceRecords(prev => {
+      const newRecords = prev.filter(record => 
+        record.date !== dateStr || 
+        !members.some(member => member.id === record.memberId)
+      );
+      
+      // 保存到 localStorage
+      localStorage.setItem('attendanceRecords', JSON.stringify(newRecords));
+      return newRecords;
     });
   };
 
@@ -718,12 +721,6 @@ const Home = () => {
               >
                 管理员管理
               </Link>
-              <button
-                onClick={resetAllData}
-                className="px-4 py-2 bg-[#ff2300] text-white rounded hover:bg-[#cc1c00]"
-              >
-                重置数据
-              </button>
             </>
           )}
           <button
