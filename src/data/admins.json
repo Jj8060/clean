@@ -1,0 +1,25 @@
+{
+  "admins": [
+    {
+      "username": "admin1",
+      "password": "admin123",
+      "isRoot": false,
+      "isDisabled": false,
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "username": "admin2",
+      "password": "admin456",
+      "isRoot": false,
+      "isDisabled": false,
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "username": "admin3",
+      "password": "admin789",
+      "isRoot": false,
+      "isDisabled": false,
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    }
+  ]
+} 

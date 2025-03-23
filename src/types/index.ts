@@ -40,7 +40,12 @@ export interface Admin {
   username: string;
   password: string;
   isRoot: boolean;  // 标识是否为终端管理员
+  isDisabled?: boolean; // 标识账户是否被禁用
   createdAt?: string;  // 创建时间
+  disabledAt?: string; // 禁用时间
+  disabledBy?: string; // 禁用操作人
+  enabledAt?: string;  // 启用时间
+  enabledBy?: string;  // 启用操作人
 }
 
 export interface DutyStatus {

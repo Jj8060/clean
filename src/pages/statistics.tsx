@@ -25,9 +25,9 @@ const StatisticsPage = () => {
         // 计算有效记录和惩罚天数（只考虑有效记录）
         const validRecords = memberRecords.filter(r => r.score !== null && r.score > 0);
         const totalPenaltyDays = memberRecords.reduce((sum, r) => {
-          // 只有评分>0且<4时才计算惩罚天数
-          if (r.score !== null && r.score > 0 && r.score < 4) {
-            return sum + (r.penaltyDays || 0);
+          // 修改：计算所有设置了惩罚天数的记录，不限制评分范围
+          if (r.penaltyDays && r.penaltyDays > 0) {
+            return sum + r.penaltyDays;
           }
           return sum;
         }, 0);

@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { AttendanceStatus } from '@/types';
+import { AttendanceStatus, Member } from '@/types';
 import { groups } from '@/data/groups';
+import { calculatePenaltyDays } from '@/utils/penaltyCalculation';
 
 interface AttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  member: { id: string; name: string };
+  member: Member;
   date: Date;
   currentStatus?: AttendanceStatus;
   onSave: (status: Partial<AttendanceStatus>) => void;
   readOnly?: boolean;
-  allMembers?: Array<{ id: string; name: string }>;
-  attendanceRecords: AttendanceStatus[];
+  allMembers?: Member[];
+  attendanceRecords?: AttendanceStatus[];
   isAdmin?: boolean;
 }
 
@@ -55,6 +56,12 @@ const AttendanceModal = ({
 
   if (!isOpen) return null;
 
+  // 获取该成员的缺勤次数
+  const getAbsentCount = () => {
+    const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
+    return memberRecords.filter(r => r.status === 'absent').length;
+  };
+
   const handleSave = () => {
     // 添加调试信息
     console.log('保存值日记录:', {
@@ -73,21 +80,23 @@ const AttendanceModal = ({
     if (status === 'absent') {
       // 缺勤默认0分
       finalScore = 0;
-      // 缺勤的惩罚天数保持不变
+      
+      // 如果用户没有手动设置惩罚天数，则使用计算函数自动计算
+      if (finalPenaltyDays === 0) {
+        const absentCount = getAbsentCount();
+        finalPenaltyDays = calculatePenaltyDays('absent', date, absentCount, null, attendanceRecords);
+      }
     } else if (status === 'fail') {
       // 不合格检查分数，如果未设置则默认5分
       finalScore = finalScore === null ? 5 : finalScore;
       
-      // 只有当分数大于0且小于4时才设置惩罚天数
-      if (finalScore > 0 && finalScore < 4) {
-        // 如果用户没有手动设置惩罚天数，则根据分数自动设置
-        if (finalPenaltyDays === 0) {
-          if (finalScore === 1) finalPenaltyDays = 3;
-          else if (finalScore === 2) finalPenaltyDays = 2;
-          else if (finalScore === 3) finalPenaltyDays = 1;
-        }
-      } else if (finalScore === 0) {
-        // 0分无需惩罚
+      // 如果用户没有手动设置惩罚天数，则使用计算函数自动计算
+      if (finalPenaltyDays === 0) {
+        finalPenaltyDays = calculatePenaltyDays('fail', date, 0, finalScore, attendanceRecords);
+      }
+      
+      // 0分无需惩罚
+      if (finalScore === 0) {
         finalPenaltyDays = 0;
       }
     } else if (status === 'present') {

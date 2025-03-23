@@ -11,6 +11,7 @@ import AddExtraDutyModal from '@/components/AddExtraDutyModal';
 import DutyCalendar from '@/components/DutyCalendar';
 import LowScoreWarning from '@/components/LowScoreWarning';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
+import { calculatePenaltyDays } from '@/utils/penaltyCalculation';
 
 // 添加低分预警组件
 const LowScoreMarquee = ({ statistics }: { statistics: any[] }) => {
@@ -430,7 +431,10 @@ const Home = () => {
     // 检查是否有20分钟内的更改
     const hasRecentChanges = attendanceRecords.some(record => {
       const recordDate = new Date(record.date);
-      return recordDate > twentyMinutesAgo && record.score >= 1 && record.score <= 10;
+      return recordDate > twentyMinutesAgo && 
+             record.score !== null && 
+             record.score >= 1 && 
+             record.score <= 10;
     }) || extraDutyMembers.some(member => {
       const memberDate = new Date(member.date);
       return memberDate > twentyMinutesAgo;
@@ -451,6 +455,7 @@ const Home = () => {
         // 3. 超出1-10分范围的记录（这些记录不会影响惩罚系统）
         return recordDate <= twentyMinutesAgo || 
                record.score === 0 || 
+               record.score === null ||
                record.score < 1 || 
                record.score > 10;
       });
@@ -558,12 +563,19 @@ const Home = () => {
     } else {
       // 设置为全体缺勤状态
       members.forEach(member => {
+        // 获取成员的缺勤次数，用于计算惩罚天数
+        const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
+        const absentCount = memberRecords.filter(r => r.status === 'absent').length;
+        
+        // 计算惩罚天数
+        const penaltyDays = calculatePenaltyDays('absent', date, absentCount, null, attendanceRecords);
+        
         const newStatus: Partial<AttendanceStatus> = {
           memberId: member.id,
           date: dateStr,
           status: 'absent',
           score: 0,
-          penaltyDays: 3,
+          penaltyDays,
           isGroupAbsent: true
         };
         handleAttendanceSave(newStatus);
@@ -650,7 +662,7 @@ const Home = () => {
         // 计算有效记录（score不为null且大于0的记录）
         const validRecords = memberRecords.filter(r => r.score !== null && r.score > 0);
         const averageScore = validRecords.length 
-          ? (validRecords.reduce((sum, r) => sum + (r.score || 0), 0) / validRecords.length).toFixed(1)
+          ? (validRecords.reduce((sum, r) => sum + (r.score !== null ? r.score : 0), 0) / validRecords.length).toFixed(1)
           : '-';
         
         return {
@@ -730,6 +742,19 @@ const Home = () => {
                 管理员管理
               </Link>
             </>
+          )}
+          {!isAdmin && (
+            <div className="mb-4 flex flex-col sm:flex-row gap-2 items-center">
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+              >
+                管理员登录
+              </button>
+              <span className="text-sm text-gray-600">
+                默认账户: admin1/admin123, admin2/admin456, admin3/admin789
+              </span>
+            </div>
           )}
           <button
             onClick={() => isAdmin ? handleLogout() : setShowLoginModal(true)}

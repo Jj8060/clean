@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Admin } from '@/types';
+import { verifyLogin } from '@/services/adminService';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -22,18 +23,11 @@ const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
   }, [isOpen]);
 
   const handleLogin = () => {
-    // 检查是否是终端管理员
-    if (username === 'ZRWY' && password === 'good luck') {
-      onLogin(true);
-      return;
-    }
-
-    // 检查普通管理员
-    const admins = JSON.parse(localStorage.getItem('admins') || '[]') as Admin[];
-    const admin = admins.find(a => a.username === username && a.password === password);
+    // 使用 adminService 中的 verifyLogin 函数进行验证
+    const { isValid, isRoot } = verifyLogin(username, password);
     
-    if (admin) {
-      onLogin(false, username);
+    if (isValid) {
+      onLogin(isRoot, username);
     } else {
       setError('用户名或密码错误');
     }

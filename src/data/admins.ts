@@ -7,4 +7,29 @@ export const rootAdmin: Admin = {
   createdAt: new Date().toISOString()
 };
 
-export const admins: Admin[] = []; 
+export const admins: Admin[] = [
+  {
+    username: 'admin1',
+    password: 'adminfirst',
+    isRoot: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    username: 'admin2',
+    password: 'adminsecond',
+    isRoot: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    username: 'admin3',
+    password: 'adminthird',
+    isRoot: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    username: 'admin4',
+    password: 'admin fourth',
+    isRoot: false,
+    createdAt: new Date().toISOString()
+  }
+]; 
