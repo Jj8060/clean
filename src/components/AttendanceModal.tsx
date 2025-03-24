@@ -14,6 +14,7 @@ interface AttendanceModalProps {
   allMembers?: Member[];
   attendanceRecords?: AttendanceStatus[];
   isAdmin?: boolean;
+  extraDutyMembers?: AttendanceStatus[];
 }
 
 const AttendanceModal = ({
@@ -26,7 +27,8 @@ const AttendanceModal = ({
   readOnly = false,
   allMembers = [],
   attendanceRecords = [],
-  isAdmin = false
+  isAdmin = false,
+  extraDutyMembers = []
 }: AttendanceModalProps) => {
   const [status, setStatus] = useState<'present' | 'absent' | 'fail' | 'pending'>(
     currentStatus?.status || 'pending'
@@ -77,6 +79,11 @@ const AttendanceModal = ({
     let finalScore = score;
     let finalPenaltyDays = penaltyDays;
     
+    // 检查是否是补值记录（检查额外值日人员列表）
+    const isCompensationDuty = extraDutyMembers?.some(
+      duty => duty.memberId === member.id && duty.date === date.toISOString()
+    );
+    
     if (status === 'absent') {
       // 缺勤默认0分
       finalScore = 0;
@@ -92,7 +99,13 @@ const AttendanceModal = ({
       
       // 如果用户没有手动设置惩罚天数，则使用计算函数自动计算
       if (finalPenaltyDays === 0) {
-        finalPenaltyDays = calculatePenaltyDays('fail', date, 0, finalScore, attendanceRecords);
+        // 如果是补值且表现不合格，追加惩罚天数
+        if (isCompensationDuty) {
+          // 不合格的补值，不仅不减免惩罚天数，还要追加惩罚
+          finalPenaltyDays = calculatePenaltyDays('fail', date, 0, finalScore, attendanceRecords);
+        } else {
+          finalPenaltyDays = calculatePenaltyDays('fail', date, 0, finalScore, attendanceRecords);
+        }
       }
       
       // 0分无需惩罚
@@ -103,8 +116,15 @@ const AttendanceModal = ({
       // 出勤检查分数，如果未设置则默认8分
       finalScore = finalScore === null ? 8 : finalScore;
       
+      // 如果是补值且出勤但表现太差（分数<4），也要追加惩罚
+      if (isCompensationDuty && finalScore > 0 && finalScore < 4 && finalPenaltyDays === 0) {
+        // 补值但表现差，追加惩罚
+        if (finalScore === 1) finalPenaltyDays = 3;
+        else if (finalScore === 2) finalPenaltyDays = 2;
+        else if (finalScore === 3) finalPenaltyDays = 1;
+      }
       // 如果出勤但分数低于4分且大于0，设置惩罚天数
-      if (finalScore > 0 && finalScore < 4 && finalPenaltyDays === 0) {
+      else if (finalScore > 0 && finalScore < 4 && finalPenaltyDays === 0) {
         if (finalScore === 1) finalPenaltyDays = 3;
         else if (finalScore === 2) finalPenaltyDays = 2;
         else if (finalScore === 3) finalPenaltyDays = 1;

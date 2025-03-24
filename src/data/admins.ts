@@ -2,7 +2,7 @@ import { Admin } from '@/types';
 
 export const rootAdmin: Admin = {
   username: 'ZRWY',
-  password: 'GL',
+  password: 'good luck',
   isRoot: true,
   createdAt: new Date().toISOString()
 };
@@ -10,19 +10,19 @@ export const rootAdmin: Admin = {
 export const admins: Admin[] = [
   {
     username: 'admin1',
-    password: 'adminfirst',
+    password: 'admin123',
     isRoot: false,
     createdAt: new Date().toISOString()
   },
   {
     username: 'admin2',
-    password: 'adminsecond',
+    password: 'admin456',
     isRoot: false,
     createdAt: new Date().toISOString()
   },
   {
     username: 'admin3',
-    password: 'adminthird',
+    password: 'admin789',
     isRoot: false,
     createdAt: new Date().toISOString()
   },

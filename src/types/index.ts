@@ -29,6 +29,7 @@ export interface AttendanceStatus {
   substitutedFor?: string[]; // 代替谁值日的记录
   isImportantEvent?: boolean; // 是否是重大活动日
   isGroupAbsent?: boolean; // 是否是全体缺勤日
+  isCompensation?: boolean; // 是否是补值减免惩罚的记录
 }
 
 export interface DutySchedule {

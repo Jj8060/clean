@@ -310,7 +310,13 @@ const CustomEvent = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onAddExtraDuty(new Date(event.start));
+              // 使用try-catch防止函数调用出错
+              try {
+                onAddExtraDuty(new Date(event.start));
+              } catch (error) {
+                console.error('添加值日人员出错:', error);
+                alert('添加值日人员出错，请重试');
+              }
             }}
             className="mt-1 w-full text-xs bg-[#2a63b7] text-white py-1 px-2 rounded-md hover:bg-[#245091] flex items-center justify-center gap-1 transition-colors"
           >
@@ -512,7 +518,13 @@ const CalendarView = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onAddExtraDuty(new Date(event.start));
+              // 使用try-catch防止函数调用出错
+              try {
+                onAddExtraDuty(new Date(event.start));
+              } catch (error) {
+                console.error('添加值日人员出错:', error);
+                alert('添加值日人员出错，请重试');
+              }
             }}
             className="mt-2 w-full text-xs bg-gray-500 text-white py-1 px-2 rounded-md hover:bg-gray-600 flex items-center justify-center gap-1 transition-colors"
           >

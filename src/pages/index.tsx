@@ -89,7 +89,8 @@ const Home = () => {
     date: string;
   }>>([]);
   const [showAddExtraDutyModal, setShowAddExtraDutyModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [currentUsername, setCurrentUsername] = useState('');
   const [groupEvaluationMembers, setGroupEvaluationMembers] = useState<{
@@ -309,36 +310,74 @@ const Home = () => {
   };
 
   // 保存额外值日人员
-  const handleSaveExtraDuty = (memberId: string) => {
-    if (selectedDate) {
-      console.log('Saving extra duty member:', {
-        memberId,
-        date: selectedDate.toISOString()
-      });
-
-      const newExtraMembers = [
-        ...extraDutyMembers,
-        {
-          memberId,
-          date: selectedDate.toISOString()
-        }
-      ];
-
-      console.log('Updated extra duty members:', newExtraMembers);
-      
-      // 更新状态
-      setExtraDutyMembers(newExtraMembers);
-      
-      // 保存到 localStorage
-      localStorage.setItem('extraDutyMembers', JSON.stringify(newExtraMembers));
-      
-      // 关闭弹窗
-      setShowAddExtraDutyModal(false);
-      setSelectedDate(null);
-
-      // 强制重新渲染日历
-      setCurrentDate(new Date(currentDate));
+  const handleSaveExtraDuty = () => {
+    if (!selectedDate || !selectedMemberId) {
+      alert('请选择日期和人员');
+      return;
     }
+
+    // 格式化当前选择的日期为ISO字符串
+    const formattedDate = selectedDate.toISOString();
+
+    // 防止重复添加
+    if (extraDutyMembers.some(duty => 
+      new Date(duty.date).toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0] && 
+      duty.memberId === selectedMemberId
+    )) {
+      alert('该人员已经在所选日期安排了额外值日');
+      return;
+    }
+
+    // 创建新的额外值日记录
+    const newDuty: AttendanceStatus = {
+      id: `extra-duty-${Date.now()}`,
+      date: formattedDate,
+      memberId: selectedMemberId,
+      status: 'pending',
+      score: 0, // 默认分数
+      comment: '' // 添加必需的comment字段
+    };
+
+    // 更新状态
+    const updatedExtraDutyMembers = [...extraDutyMembers, newDuty];
+    setExtraDutyMembers(updatedExtraDutyMembers);
+    localStorage.setItem('extraDutyMembers', JSON.stringify(updatedExtraDutyMembers));
+
+    // 获取成员的总惩罚天数
+    const memberRecords = attendanceRecords.filter(record => record.memberId === selectedMemberId);
+    const totalPenaltyDays = memberRecords.reduce((total, record) => total + (record.penaltyDays || 0), 0);
+
+    // 如果成员有惩罚天数，则自动减少一天
+    if (totalPenaltyDays > 0) {
+      // 创建一个减免惩罚记录
+      const compensationRecord: Partial<AttendanceStatus> = {
+        id: `compensation-${Date.now()}`,
+        date: new Date().toISOString(), // 当前日期
+        memberId: selectedMemberId,
+        status: 'present', // 标记为出勤
+        score: 8, // 默认良好表现
+        penaltyDays: -1, // 减少一天惩罚
+        comment: `补值自动减免一天惩罚 (补值日期: ${selectedDate.toLocaleDateString()})`,
+        isCompensation: true // 标记为补值减免记录
+      };
+
+      // 更新考勤记录
+      const updatedAttendanceRecords = [...attendanceRecords, compensationRecord as AttendanceStatus];
+      setAttendanceRecords(updatedAttendanceRecords);
+      localStorage.setItem('attendanceRecords', JSON.stringify(updatedAttendanceRecords));
+
+      // 提示用户添加成功并减少惩罚
+      alert(`已添加额外值日人员，并自动减少一天惩罚天数`);
+    } else {
+      // 如果没有惩罚天数，仅提示添加成功
+      alert('已添加额外值日人员');
+    }
+
+    // 关闭模态框
+    setShowAddExtraDutyModal(false);
+    // 重置选择
+    setSelectedMemberId('');
+    setSelectedDate(new Date());
   };
 
   // 修改登录处理函数
@@ -684,6 +723,70 @@ const Home = () => {
     return stats;
   })();
 
+  // 添加额外值日模态框
+  const renderAddExtraDutyModal = () => {
+    if (!showAddExtraDutyModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
+        <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-full">
+          <h2 className="text-xl font-bold mb-4">添加额外值日人员</h2>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">选择日期</label>
+            <input 
+              type="date" 
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">选择人员</label>
+            <select 
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              value={selectedMemberId}
+              onChange={(e) => setSelectedMemberId(e.target.value)}
+            >
+              <option value="">请选择人员</option>
+              {groups.flatMap(group => 
+                group.members.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.name} ({group.name})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          
+          <p className="text-sm text-gray-500 mb-4">
+            选择日期: {selectedDate ? format(selectedDate, 'yyyy年MM月dd日') : '未选择'}
+          </p>
+          
+          <p className="text-sm text-yellow-600 mb-4">
+            如果是因惩罚而补值，将自动减少一天惩罚。但若补值表现不合格，仍可能被追加惩罚天数。
+          </p>
+          
+          <div className="flex justify-end space-x-2">
+            <button 
+              onClick={() => setShowAddExtraDutyModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button 
+              onClick={handleSaveExtraDuty}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-[#2a63b7]">
@@ -743,27 +846,21 @@ const Home = () => {
               </Link>
             </>
           )}
-          {!isAdmin && (
-            <div className="mb-4 flex flex-col sm:flex-row gap-2 items-center">
-              <button
-                onClick={() => setShowLoginModal(true)}
-                className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
-              >
-                管理员登录
-              </button>
-              <span className="text-sm text-gray-600">
-                默认账户: admin1/admin123, admin2/admin456, admin3/admin789
-              </span>
-            </div>
+          {!isAdmin ? (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="px-4 py-2 bg-[#2a63b7] text-white rounded hover:bg-[#245091]"
+            >
+              管理员登录
+            </button>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-[#ff2300] text-white rounded"
+            >
+              退出管理
+            </button>
           )}
-          <button
-            onClick={() => isAdmin ? handleLogout() : setShowLoginModal(true)}
-            className={`px-4 py-2 rounded ${
-              isAdmin ? 'bg-[#ff2300] text-white' : 'bg-[#2a63b7] text-white'
-            }`}
-          >
-            {isAdmin ? '退出管理' : '管理员登录'}
-          </button>
         </div>
       </div>
 
@@ -922,63 +1019,72 @@ const Home = () => {
                               {format(date, 'EEEE', { locale: zhCN })}
                             </div>
                           </div>
-                          {isAdmin && (
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleGroupAbsent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
-                                className={`px-2 py-1 text-xs ${
-                                  allMembers.every(m => 
+                          <div className="flex gap-1">
+                            {isAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handleGroupAbsent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                  className={`px-2 py-1 text-xs ${
+                                    allMembers.every(m => 
+                                      attendanceRecords.find(r => 
+                                        r.memberId === m.id && 
+                                        r.date === date.toISOString() && 
+                                        r.isGroupAbsent
+                                      )
+                                    )
+                                      ? 'bg-gray-500'
+                                      : 'bg-red-500'
+                                  } text-white rounded hover:bg-opacity-80`}
+                                  title={allMembers.every(m => 
                                     attendanceRecords.find(r => 
                                       r.memberId === m.id && 
                                       r.date === date.toISOString() && 
                                       r.isGroupAbsent
                                     )
-                                  )
-                                    ? 'bg-gray-500'
-                                    : 'bg-red-500'
-                                } text-white rounded hover:bg-opacity-80`}
-                                title={allMembers.every(m => 
-                                  attendanceRecords.find(r => 
-                                    r.memberId === m.id && 
-                                    r.date === date.toISOString() && 
-                                    r.isGroupAbsent
-                                  )
-                                ) ? '取消全体缺勤' : '全体缺勤'}
-                              >
-                                缺
-                              </button>
-                              <button
-                                onClick={() => handleImportantEvent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
-                                className={`px-2 py-1 text-xs ${
-                                  allMembers.every(m => 
+                                  ) ? '取消全体缺勤' : '全体缺勤'}
+                                >
+                                  缺
+                                </button>
+                                <button
+                                  onClick={() => handleImportantEvent(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                  className={`px-2 py-1 text-xs ${
+                                    allMembers.every(m => 
+                                      attendanceRecords.find(r => 
+                                        r.memberId === m.id && 
+                                        r.date === date.toISOString() && 
+                                        r.isImportantEvent
+                                      )
+                                    )
+                                      ? 'bg-gray-500'
+                                      : 'bg-purple-500'
+                                  } text-white rounded hover:bg-opacity-80`}
+                                  title={allMembers.every(m => 
                                     attendanceRecords.find(r => 
                                       r.memberId === m.id && 
                                       r.date === date.toISOString() && 
                                       r.isImportantEvent
                                     )
-                                  )
-                                    ? 'bg-gray-500'
-                                    : 'bg-purple-500'
-                                } text-white rounded hover:bg-opacity-80`}
-                                title={allMembers.every(m => 
-                                  attendanceRecords.find(r => 
-                                    r.memberId === m.id && 
-                                    r.date === date.toISOString() && 
-                                    r.isImportantEvent
-                                  )
-                                ) ? '取消重大活动' : '重大活动'}
-                              >
-                                活
-                              </button>
-                              <button
-                                onClick={() => handleResetDay(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
-                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                                title="重置当天"
-                              >
-                                重
-                              </button>
-                            </div>
-                          )}
+                                  ) ? '取消重大活动' : '重大活动'}
+                                >
+                                  活
+                                </button>
+                                <button
+                                  onClick={() => handleResetDay(date, allMembers.filter((m): m is DutyMember => m !== undefined))}
+                                  className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  title="重置当天"
+                                >
+                                  重
+                                </button>
+                                <button
+                                  onClick={() => handleAddExtraDuty(date)}
+                                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                                  title="添加值日人员"
+                                >
+                                  添加
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         <div className="space-y-2">
@@ -1111,14 +1217,7 @@ const Home = () => {
       />
 
       {/* 添加额外值日人员弹窗 */}
-      {selectedDate && (
-        <AddExtraDutyModal
-          isOpen={showAddExtraDutyModal}
-          onClose={() => setShowAddExtraDutyModal(false)}
-          onSave={handleSaveExtraDuty}
-          date={selectedDate}
-        />
-      )}
+      {renderAddExtraDutyModal()}
 
       {/* 修改密码弹窗 */}
       <ChangePasswordModal

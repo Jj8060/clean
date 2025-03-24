@@ -303,6 +303,15 @@ const Calendar = ({
                     >
                       评价
                     </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddExtraDuty(day);
+                      }}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                    >
+                      +值日
+                    </button>
                   </div>
                 )}
               </div>
