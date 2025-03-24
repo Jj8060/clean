@@ -25,7 +25,7 @@ const MEMBERS_DATA = [
   { name: '高锐', group: 7 },
   { name: '刘宪蓉', group: 8 },
   { name: '徐若轻', group: 8 },
-  { name: '樊洛岩', group: 8 }
+  { name: '樊洛言', group: 8 }
 ];
 
 // 生成组别数据
