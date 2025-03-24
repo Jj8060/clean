@@ -345,7 +345,7 @@ const Home = () => {
 
     // 获取成员的总惩罚天数
     const memberRecords = attendanceRecords.filter(record => record.memberId === selectedMemberId);
-    const totalPenaltyDays = memberRecords.reduce((total, record) => total + (record.penaltyDays || 0), 0);
+    const totalPenaltyDays = memberRecords.reduce((sum, record) => sum + (record.penaltyDays || 0), 0);
 
     // 如果成员有惩罚天数，则自动减少一天
     if (totalPenaltyDays > 0) {

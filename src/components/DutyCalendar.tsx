@@ -375,11 +375,11 @@ const Calendar = ({
             <div className="space-y-1">
               {group.members.map(member => {
                 const memberRecords = attendanceRecords.filter(r => r.memberId === member.id);
-                // 修改计算逻辑，只考虑有效记录的惩罚天数（与统计页面保持一致）
+                // 修改计算逻辑，考虑所有惩罚天数记录，包括正值和负值
                 const calculatedPenaltyDays = memberRecords.reduce((sum, r) => {
-                  // 只有评分>0时计算惩罚天数
-                  if (r.penaltyDays && r.penaltyDays > 0) {
-                    return sum + (r.penaltyDays || 0);
+                  // 计算所有惩罚天数，包括负值（减免记录）
+                  if (r.penaltyDays) {
+                    return sum + r.penaltyDays;
                   }
                   return sum;
                 }, 0);
