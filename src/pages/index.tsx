@@ -83,6 +83,14 @@ const Home = () => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceStatus[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  // 是否包含周末显示
+  const [includeWeekend, setIncludeWeekend] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('includeWeekend');
+    return saved ? saved === 'true' : false;
+  });
+  // 学期起始锚点（在 2/1 或 8/1 自动启用）
+  const [semesterStart, setSemesterStart] = useState<Date | null>(null);
   const [scheduleOverrides, setScheduleOverrides] = useState<{[key: string]: string}>({});
   const [extraDutyMembers, setExtraDutyMembers] = useState<Array<{
     memberId: string;
@@ -104,6 +112,23 @@ const Home = () => {
     if (savedOverrides) {
       setScheduleOverrides(JSON.parse(savedOverrides));
     }
+  }, []);
+
+  // 保存 includeWeekend 到本地
+  useEffect(() => {
+    localStorage.setItem('includeWeekend', includeWeekend ? 'true' : 'false');
+  }, [includeWeekend]);
+
+  // 在 2/1 或 8/1 自动设置学期锚点并重置周选择
+  useEffect(() => {
+    const today = new Date();
+    const isFeb1 = today.getMonth() === 1 && today.getDate() === 1; // 2/1
+    const isAug1 = today.getMonth() === 7 && today.getDate() === 1; // 8/1
+    if (!isFeb1 && !isAug1) return;
+    const anchor = new Date(today.getFullYear(), isFeb1 ? 1 : 7, 1);
+    anchor.setHours(0, 0, 0, 0);
+    setSemesterStart(anchor);
+    setListViewDate(anchor);
   }, []);
 
   // 从 localStorage 加载额外值日人员记录
@@ -350,7 +375,7 @@ const Home = () => {
     // 如果成员有惩罚天数，则自动减少一天
     if (totalPenaltyDays > 0) {
       // 创建一个减免惩罚记录
-      const compensationRecord: Partial<AttendanceStatus> = {
+      const compensationRecord: AttendanceStatus = {
         id: `compensation-${Date.now()}`,
         date: new Date().toISOString(), // 当前日期
         memberId: selectedMemberId,
@@ -358,11 +383,11 @@ const Home = () => {
         score: 8, // 默认良好表现
         penaltyDays: -1, // 减少一天惩罚
         comment: `补值自动减免一天惩罚 (补值日期: ${selectedDate.toLocaleDateString()})`,
-        isCompensation: true // 标记为补值减免记录
+        isCompensation: true
       };
 
       // 更新考勤记录
-      const updatedAttendanceRecords = [...attendanceRecords, compensationRecord as AttendanceStatus];
+      const updatedAttendanceRecords = [...attendanceRecords, compensationRecord];
       setAttendanceRecords(updatedAttendanceRecords);
       localStorage.setItem('attendanceRecords', JSON.stringify(updatedAttendanceRecords));
 
@@ -397,25 +422,46 @@ const Home = () => {
   // 修改周选择器组件
   const WeekSelector = ({ 
     currentDate, 
-    onChange 
+    onChange,
+    includeWeekend,
+    onToggleWeekend,
+    semesterStart
   }: { 
     currentDate: Date; 
     onChange: (date: Date) => void;
+    includeWeekend: boolean;
+    onToggleWeekend: () => void;
+    semesterStart: Date | null;
   }) => {
     const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
     
-    // 获取指定年份的所有工作周
+    // 获取工作周（按学期范围或整年），并生成 7 天范围文本
     const getWorkWeeks = (year: number) => {
-      const startDate = new Date(year, 0, 1);
-      const endDate = new Date(year, 11, 31);
+      // 学期模式：若传入 semesterStart，则以 2/1 → 7/31 或 8/1 → 次年 1/31 为边界
+      let startDate: Date;
+      let endDate: Date;
+      if (semesterStart) {
+        const isSpring = semesterStart.getMonth() === 1; // 2月
+        startDate = new Date(semesterStart);
+        if (isSpring) {
+          endDate = new Date(semesterStart.getFullYear(), 6, 31); // 7/31
+        } else {
+          endDate = new Date(semesterStart.getFullYear() + 1, 0, 31); // 次年1/31
+        }
+      } else {
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
+      }
+
       const weeks = eachWeekOfInterval(
         { start: startDate, end: endDate },
         { weekStartsOn: 1 }
-      ).filter(date => date.getFullYear() === year); // 只保留指定年份的周
+      ).filter(w => w >= startDate && w <= endDate);
       
       return weeks.map((weekStart, index) => {
-        const weekEnd = addDays(weekStart, 4); // 只到周五
+        // 显示完整周范围（周一至周日）
+        const weekEnd = addDays(weekStart, 6);
         return {
           weekNumber: index + 1,
           start: weekStart,
@@ -447,6 +493,16 @@ const Home = () => {
             <option key={year} value={year}>{year}年</option>
           ))}
         </select>
+        {/* 周末开关 */}
+        <label className="flex items-center gap-2 text-sm select-none">
+          <input
+            type="checkbox"
+            checked={includeWeekend}
+            onChange={onToggleWeekend}
+            aria-label="包含周末"
+          />
+          包含周末
+        </label>
         <select
           value={currentWeek ? weeks.indexOf(currentWeek) : 0}
           onChange={(e) => {
@@ -911,6 +967,9 @@ const Home = () => {
             <WeekSelector
               currentDate={listViewDate}
               onChange={setListViewDate}
+              includeWeekend={includeWeekend}
+              onToggleWeekend={() => setIncludeWeekend(prev => !prev)}
+              semesterStart={semesterStart}
             />
           </div>
 
@@ -931,9 +990,10 @@ const Home = () => {
               return null;
             }
 
-            const weekDays = Array.from({ length: 5 }, (_, i) => 
-              addDays(weekStart, i)
-            ).filter(date => !isWeekend(date));
+            // 根据开关决定显示 5 天或 7 天；范围始终以周一开始
+            const totalDays = includeWeekend ? 7 : 5;
+            const rawDays = Array.from({ length: totalDays }, (_, i) => addDays(weekStart, i));
+            const weekDays = includeWeekend ? rawDays : rawDays.filter(date => !isWeekend(date));
 
             return (
               <div 
@@ -943,7 +1003,7 @@ const Home = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">
                     {format(weekStart, 'yyyy年MM月dd日', { locale: zhCN })} - 
-                    {format(addDays(weekStart, 4), 'MM月dd日', { locale: zhCN })}
+                    {format(addDays(weekStart, 6), 'MM月dd日', { locale: zhCN })}
                   </h2>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-[#2a63b7]">本周值日组:</span>

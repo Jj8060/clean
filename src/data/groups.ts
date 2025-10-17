@@ -6,7 +6,7 @@ const MEMBERS_DATA = [
   { name: '周抒墨', group: 1 },
   { name: '谈子盈', group: 1 },
   { name: '邸为之', group: 2 },
-  { name: '洪声浩', group: 2 },
+  { name: 'Alex', group: 2 },
   { name: '甘贝铭', group: 2 },
   { name: '王行健', group: 3 },
   { name: '谢贝俊', group: 3 },

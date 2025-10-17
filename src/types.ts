@@ -37,6 +37,8 @@ export interface AttendanceStatus {
   exchangedWith?: string;
   substitutionCount?: number;
   substitutedFor?: string[];
+  // 是否是补值减免惩罚的记录
+  isCompensation?: boolean;
   comment: string;
 }
 
